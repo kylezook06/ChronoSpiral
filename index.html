@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChronoSpiral Prototype</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0a0a18;
+        color: #e9f4ff;
+        font-family: "Press Start 2P", "Courier New", monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      header {
+        margin: 16px 0 8px;
+        text-align: center;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        letter-spacing: 1px;
+      }
+
+      header p {
+        margin: 4px 0 0;
+        font-size: 0.7rem;
+        color: #b6d7ff;
+      }
+
+      canvas {
+        border: 3px solid #2bd1a1;
+        image-rendering: pixelated;
+      }
+
+      footer {
+        margin: 10px 0 16px;
+        font-size: 0.7rem;
+        color: #7ebeff;
+        text-align: center;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.1/lib/p5.min.js"></script>
+    <script src="sketch.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <h1>ChronoSpiral: Radial DK Prototype</h1>
+      <p>Arrow keys to run along the spiral • X to jump inward</p>
+    </header>
+    <main></main>
+    <footer>
+      Early concept demo: radial gravity + Fibonacci-esque spiral. Warp to advance eras.
+    </footer>
+  </body>
+</html>
