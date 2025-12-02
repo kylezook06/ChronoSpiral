@@ -43,10 +43,10 @@ class Player {
     // Start on-screen partway along the spiral instead of at the outer edge
     this.theta = maxTheta * 0.6;
     this.rVel = 0;
-    this.thetaVel = 0;
     this.jumpStrength = -6; // inward impulse
     this.onGround = false;
     this.radius = 14;
+    this.coyoteFrames = 0;
 
     // Initialize derived values so rendering is correct on the first frame
     this.r = spiralA * this.theta;
@@ -57,29 +57,23 @@ class Player {
   update() {
     const level = levels[currentLevel % levels.length];
     const gravity = 0.18; // radial outward acceleration
-    const runAccel = 0.005;
-    const runMax = 0.08;
+    const runSpeed = 0.07;
 
-    // Horizontal control (angular)
+    // Horizontal control (angular) — immediate and snappy
     if (keyIsDown(LEFT_ARROW)) {
-      this.thetaVel = constrain(this.thetaVel - runAccel, -runMax, runMax);
-    } else if (keyIsDown(RIGHT_ARROW)) {
-      this.thetaVel = constrain(this.thetaVel + runAccel, -runMax, runMax);
-    } else {
-      this.thetaVel *= 0.92; // friction
+      this.theta -= runSpeed;
+    }
+    if (keyIsDown(RIGHT_ARROW)) {
+      this.theta += runSpeed;
     }
 
-    // Jump inward toward center
-    if (this.onGround && (keyIsDown(88) || keyIsDown(UP_ARROW))) {
-      this.rVel = this.jumpStrength;
-      this.onGround = false;
-    }
+    // Clamp theta within spiral limits
+    this.theta = constrain(this.theta, 0, maxTheta);
 
     // Apply gravity
     this.rVel += gravity;
 
-    // Integrate
-    this.theta = constrain(this.theta + this.thetaVel, 0, maxTheta);
+    // Integrate radius toward/away from the spiral
     let targetR = spiralA * this.theta;
     let currentR = this.getR();
 
@@ -91,6 +85,22 @@ class Player {
       this.onGround = true;
     } else {
       this.onGround = false;
+      currentR += this.rVel;
+    }
+
+    // Brief grace period after leaving a platform
+    if (this.onGround) {
+      this.coyoteFrames = 6;
+    } else if (this.coyoteFrames > 0) {
+      this.coyoteFrames--;
+    }
+
+    // Jump inward toward center
+    const jumpKeyDown = keyIsDown(88) || keyIsDown(UP_ARROW) || keyIsDown(32); // X, Up, or Space
+    if (this.coyoteFrames > 0 && jumpKeyDown) {
+      this.rVel = this.jumpStrength;
+      this.onGround = false;
+      this.coyoteFrames = 0;
       currentR += this.rVel;
     }
 
@@ -245,7 +255,7 @@ function drawHUD(level) {
   textAlign(LEFT, TOP);
   text(level.name, 14, 12);
   text(`Theme hint: ${level.musicHint}`, 14, 30);
-  text("Arrow keys: run • X/Up: jump inward", 14, 48);
+  text("Arrow keys: run • X/Up/Space: jump inward", 14, 48);
 
   const progress = map(player.getR(), spiralA * maxTheta, 0, 0, width * 0.45, true);
   const barY = height - 24;
