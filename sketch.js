@@ -1,7 +1,7 @@
 // ChronoSpiral: Radial Donkey-Kong-inspired prototype
 // p5.js 1.11.x
 
-const CANVAS_W = 960;
+const CANVAS_W = 960; // kept as legacy, not used for createCanvas
 const CANVAS_H = 540;
 
 let centerX, centerY;
@@ -211,12 +211,27 @@ class Player {
 
     const t = frameCount * 0.25; // animation phase
 
+    // Angle from center to player (radial outward direction)
+    const radialAngle = Math.atan2(this.y - centerY, this.x - centerX);
+
     push();
     translate(this.x, this.y);
 
-    // Tilt a little in direction of motion when running
+    // --- SHADOW (world space, before rotating character) ---
+    const shadowDist = 10;
+    const sx = Math.cos(radialAngle) * shadowDist;
+    const sy = Math.sin(radialAngle) * shadowDist;
+    noStroke();
+    fill(0, 60);
+    ellipse(sx, sy, 20, 6);
+
+    // --- ALIGN FEET OUTWARD ---
+    rotate(radialAngle - HALF_PI);
+
+    // Body bob when running
     if (isRunning) {
-      rotate(this.movingDir * 0.12);
+      const bob = 1.5 * Math.sin(t * 2);
+      translate(0, bob);
     }
 
     // Slight lift when airborne
@@ -224,23 +239,27 @@ class Player {
       translate(0, -2);
     }
 
-    // Shadow
-    noStroke();
-    fill(0, 60);
-    ellipse(0, 8, 20, 6);
+    // Extra lean in direction of motion along tangent
+    if (isRunning) {
+      rotate(this.movingDir * 0.18);
+    }
 
     // LEGS (behind body)
     stroke(0);
     strokeWeight(3);
     strokeCap(ROUND);
     noFill();
-    let legSwing = isRunning ? 4 * Math.sin(t) : 0;
-    let legSpread = 4;
+
+    const legPhase = t * 2;
+    const legAmp = isRunning ? 6 : 0;
+    const legSpread = 4;
 
     // Left leg
-    line(-legSpread - legSwing, 4, -legSpread - legSwing, 14);
-    // Right leg
-    line(legSpread + legSwing, 4, legSpread + legSwing, 14);
+    let leftSwing = legAmp * Math.sin(legPhase);
+    line(-legSpread, 4, -legSpread + leftSwing, 14);
+    // Right leg (opposite phase)
+    let rightSwing = legAmp * Math.sin(legPhase + Math.PI);
+    line(legSpread, 4, legSpread + rightSwing, 14);
 
     // BODY (chubby coat)
     noStroke();
@@ -263,12 +282,15 @@ class Player {
     strokeWeight(3);
     strokeCap(ROUND);
     noFill();
-    let armSwing = isRunning ? 4 * Math.sin(t + Math.PI / 2) : 0;
+    const armPhase = t * 2;
+    const armAmp = isRunning ? 6 : 2;
 
     // Left arm
-    line(-10 + armSwing, -6, -16 + armSwing, -2);
+    let leftArmSwing = armAmp * Math.sin(armPhase + Math.PI);
+    line(-8, -8, -14 + leftArmSwing, -4);
     // Right arm
-    line(10 + armSwing, -6, 16 + armSwing, -2);
+    let rightArmSwing = armAmp * Math.sin(armPhase);
+    line(8, -8, 14 + rightArmSwing, -4);
 
     // HEAD
     noStroke();
@@ -451,13 +473,19 @@ class TimeShard {
 // --- p5 setup & draw ---
 
 function setup() {
-  createCanvas(CANVAS_W, CANVAS_H);
+  createCanvas(windowWidth, windowHeight); // FULL-SCREEN CANVAS
   centerX = width / 2;
   centerY = height / 2;
   player = new Player();
   generateEnemies();
   generateShards();
   textFont("Courier New");
+}
+
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  centerX = width / 2;
+  centerY = height / 2;
 }
 
 function draw() {
