@@ -13,14 +13,18 @@ let maxTheta = 10 * Math.PI;
 let player;
 let currentLevel = 0;
 
+const START_THETA_FACTOR = 0.9; // start near the outer edge
+
 const levels = [
   {
     name: "Stage 1 — Neanderthal",
     palette: { bg: [12, 12, 28], spiral: [90, 200, 140], portal: [80, 180, 255] },
     musicHint: "Cavern beats, bone clacks",
     enemyTint: [220, 120, 80],
+    enemyType: "boulder",
     enemyCount: 4,
     enemyOffsets: [-20, 20],
+    shardCount: 5,
     // Simple Archimedean spiral
     platformCurve: (theta) => spiralA * theta,
   },
@@ -29,8 +33,10 @@ const levels = [
     palette: { bg: [9, 10, 24], spiral: [200, 150, 255], portal: [255, 205, 90] },
     musicHint: "Sitar-like arps, tabla blips",
     enemyTint: [255, 140, 120],
+    enemyType: "lotusOrb",
     enemyCount: 6,
     enemyOffsets: [-30, -10, 10, 30],
+    shardCount: 7,
     // Lotus/mandala-esque: spiral + radial petals
     platformCurve: (theta) => {
       const base = spiralA * theta;
@@ -44,8 +50,10 @@ const levels = [
     palette: { bg: [16, 10, 18], spiral: [240, 200, 120], portal: [255, 240, 180] },
     musicHint: "Desert winds, square-wave chants",
     enemyTint: [255, 170, 70],
+    enemyType: "scarab",
     enemyCount: 7,
     enemyOffsets: [-40, -20, 0, 20, 40],
+    shardCount: 8,
     // Stepped pyramid: spiral snapped to tiered steps
     platformCurve: (theta) => {
       const base = spiralA * theta;
@@ -58,8 +66,10 @@ const levels = [
     palette: { bg: [8, 12, 26], spiral: [120, 220, 255], portal: [180, 230, 255] },
     musicHint: "Lyre plucks over arps",
     enemyTint: [140, 200, 255],
+    enemyType: "hoplite",
     enemyCount: 8,
     enemyOffsets: [-35, -15, 15, 35],
+    shardCount: 9,
     // Star / laurel-like: spiral with spikes
     platformCurve: (theta) => {
       const base = spiralA * theta;
@@ -72,6 +82,8 @@ const levels = [
 ];
 
 const enemies = [];
+const shards = [];
+let totalShardsCollected = 0;
 
 // --- Helpers for current level & platform curve ---
 
@@ -87,15 +99,14 @@ function platformR(theta) {
 
 class Player {
   constructor() {
-    // Start on-screen partway along the spiral instead of at the outer edge
-    this.theta = maxTheta * 0.6;
+    // Start near the "outer" end of the path
+    this.theta = maxTheta * START_THETA_FACTOR;
     this.rVel = 0;
     this.jumpStrength = -6; // inward impulse
     this.onGround = false;
     this.radius = 14;
     this.coyoteFrames = 0;
 
-    // Initialize derived values so rendering is correct on the first frame
     const initialR = platformR(this.theta);
     this.r = initialR;
     this.x = centerX + initialR * Math.cos(this.theta);
@@ -143,7 +154,8 @@ class Player {
     }
 
     // Jump inward toward center
-    const jumpKeyDown = keyIsDown(88) || keyIsDown(UP_ARROW) || keyIsDown(32); // X, Up, or Space
+    const jumpKeyDown =
+      keyIsDown(88) || keyIsDown(UP_ARROW) || keyIsDown(32); // X, Up, or Space
 
     if (this.coyoteFrames > 0 && jumpKeyDown) {
       this.rVel = this.jumpStrength;
@@ -152,9 +164,12 @@ class Player {
       currentR += this.rVel;
     }
 
-    // Prevent falling off outer edge (based on current level's outer radius)
-    const maxR = platformR(maxTheta) + 60;
-    currentR = constrain(currentR, 0, maxR);
+    // Check for falling off the outer edge: if too far beyond the outer radius, reset
+    const outerLimit = platformR(maxTheta) + 80;
+    if (currentR > outerLimit) {
+      resetPlayerToStart();
+      return;
+    }
 
     // Update position from polar
     this.x = centerX + currentR * Math.cos(this.theta);
@@ -208,14 +223,31 @@ class Enemy {
     this.theta = theta;
     this.offset = offset;
     this.dir = random([1, -1]);
-    this.speed = random(0.01, 0.03) * this.dir;
+    this.baseSpeed = random(0.01, 0.03);
+    this.speed = this.baseSpeed * this.dir;
   }
 
   update() {
+    const level = currentLevelObj();
+    // Move along the curve
     this.theta = constrain(this.theta + this.speed, 0, maxTheta);
 
-    const baseR = platformR(this.theta);
-    const radius = baseR + this.offset;
+    let baseR = platformR(this.theta);
+    let radius = baseR + this.offset;
+
+    // Slight behavior variations per enemy type
+    if (level.enemyType === "scarab") {
+      // scarabs wiggle slightly radial
+      radius += 8 * Math.sin(frameCount * 0.2 + this.theta);
+    } else if (level.enemyType === "lotusOrb") {
+      // orbs float in and out gently
+      radius += 6 * Math.sin(frameCount * 0.15 + this.theta * 0.5);
+    } else if (level.enemyType === "hoplite") {
+      // hoplite phantoms move a bit faster
+      this.speed = this.baseSpeed * 1.4 * this.dir;
+    } else {
+      this.speed = this.baseSpeed * this.dir;
+    }
 
     this.x = centerX + radius * Math.cos(this.theta);
     this.y = centerY + radius * Math.sin(this.theta);
@@ -223,6 +255,7 @@ class Enemy {
 
     // Bounce when hitting range ends
     if (this.theta <= 0 || this.theta >= maxTheta) {
+      this.dir *= -1;
       this.speed *= -1;
     }
   }
@@ -230,16 +263,94 @@ class Enemy {
   draw() {
     const level = currentLevelObj();
     const tint = level.enemyTint;
+
     push();
     translate(this.x, this.y);
     stroke(0);
     strokeWeight(3);
     fill(tint[0], tint[1], tint[2]);
-    rectMode(CENTER);
 
-    // Simple "club guy" / generic baddie silhouette
-    rect(0, -6, 16, 16, 3); // body
-    rect(0, -16, 12, 6, 2); // head
+    switch (level.enemyType) {
+      case "boulder":
+        // Simple rolling rock
+        ellipse(0, 0, 24, 24);
+        // crack line
+        stroke(0);
+        line(-6, -4, 3, 4);
+        break;
+      case "lotusOrb":
+        // Glowing orb / mandala spirit
+        ellipse(0, 0, 20, 20);
+        noFill();
+        ellipse(0, 0, 28, 28);
+        break;
+      case "scarab":
+        // Beetle-ish silhouette
+        ellipse(0, -2, 18, 14); // body
+        rect(0, -9, 10, 6, 2); // head
+        line(-10, 4, -4, 0);
+        line(10, 4, 4, 0);
+        break;
+      case "hoplite":
+        // Ghostly hoplite helm shape
+        rectMode(CENTER);
+        rect(0, -6, 16, 18, 4); // helm
+        fill(0);
+        rect(-4, -8, 3, 3); // eye slit
+        rect(4, -8, 3, 3);
+        break;
+      default:
+        // Fallback generic baddie
+        rectMode(CENTER);
+        rect(0, -6, 16, 16, 3);
+        rect(0, -16, 12, 6, 2);
+    }
+
+    pop();
+  }
+}
+
+// --- Time Shard (collectable) ---
+
+class TimeShard {
+  constructor(theta, offset) {
+    this.theta = theta;
+    this.offset = offset;
+    this.collected = false;
+    this.updatePosition();
+  }
+
+  updatePosition() {
+    const baseR = platformR(this.theta);
+    const radius = baseR + this.offset;
+    this.r = radius;
+    this.x = centerX + radius * Math.cos(this.theta);
+    this.y = centerY + radius * Math.sin(this.theta);
+  }
+
+  update() {
+    if (this.collected) return;
+    this.updatePosition();
+  }
+
+  draw() {
+    if (this.collected) return;
+
+    push();
+    translate(this.x, this.y);
+    const pulse = 2 * Math.sin(frameCount * 0.25);
+    stroke(0);
+    strokeWeight(2);
+    fill(200, 240, 255);
+    rotate(frameCount * 0.04);
+
+    const size = 10 + pulse;
+    beginShape();
+    vertex(0, -size);
+    vertex(size, 0);
+    vertex(0, size);
+    vertex(-size, 0);
+    endShape(CLOSE);
 
     pop();
   }
@@ -253,6 +364,7 @@ function setup() {
   centerY = height / 2;
   player = new Player();
   generateEnemies();
+  generateShards();
   textFont("Courier New");
 }
 
@@ -262,6 +374,7 @@ function draw() {
 
   drawPortal(level);
   drawSpiral(level);
+  drawShards();
   drawEnemies();
 
   player.update();
@@ -289,7 +402,7 @@ function drawSpiral(level) {
 function drawPortal(level) {
   noStroke();
   fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 200);
-  const pulse = 8 * sin(frameCount * 0.05) + 24;
+  const pulse = 8 * Math.sin(frameCount * 0.05) + 24;
   ellipse(centerX, centerY, 32 + pulse, 32 + pulse);
   fill(255, 255, 255, 180);
   ellipse(centerX, centerY, 16 + pulse * 0.3, 16 + pulse * 0.3);
@@ -302,8 +415,23 @@ function drawEnemies() {
 
     // Simple collision: distance-based
     const d = dist(player.x, player.y, e.x, e.y);
-    if (d < player.radius + 10) {
-      resetPlayer();
+    if (d < player.radius + 12) {
+      resetPlayerToStart();
+    }
+  });
+}
+
+function drawShards() {
+  shards.forEach((s) => {
+    s.update();
+    s.draw();
+
+    if (!s.collected) {
+      const d = dist(player.x, player.y, s.x, s.y);
+      if (d < player.radius + 10) {
+        s.collected = true;
+        totalShardsCollected++;
+      }
     }
   });
 }
@@ -330,22 +458,24 @@ function drawHUD(level) {
   fill(230);
   textAlign(LEFT, CENTER);
   text("Warp Progress", 14, barY - 14);
+
+  // Shard HUD
+  const levelShardTotal = shards.length;
+  textAlign(LEFT, TOP);
+  text(`Time Shards: ${countCollectedInCurrentLevel()} / ${levelShardTotal}`, 14, 64);
 }
 
 // --- Level / game flow ---
 
 function warpToNextLevel() {
   currentLevel = (currentLevel + 1) % levels.length;
-  resetPlayer(true);
+  resetPlayerToStart();
   generateEnemies();
+  generateShards();
 }
 
-function resetPlayer(resetTheta = false) {
+function resetPlayerToStart() {
   player = new Player();
-  if (!resetTheta) {
-    // Drop the player a bit outward so restarts feel snappy
-    player.theta = constrain(player.theta + 1.8, 0, maxTheta);
-  }
 }
 
 function generateEnemies() {
@@ -359,4 +489,25 @@ function generateEnemies() {
     const offset = random(offsets);
     enemies.push(new Enemy(theta, offset));
   }
+}
+
+function generateShards() {
+  shards.length = 0;
+  const level = currentLevelObj();
+  const count = level.shardCount || 6;
+
+  for (let i = 0; i < count; i++) {
+    const theta = map(i + 0.5, 0, count, 0.8 * Math.PI, maxTheta - 1.5 * Math.PI);
+    // Alternate inner/outer placement around the curve
+    const offset = i % 2 === 0 ? -25 : 25;
+    shards.push(new TimeShard(theta, offset));
+  }
+}
+
+function countCollectedInCurrentLevel() {
+  let c = 0;
+  shards.forEach((s) => {
+    if (s.collected) c++;
+  });
+  return c;
 }
