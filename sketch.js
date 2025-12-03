@@ -101,11 +101,13 @@ class Player {
   constructor() {
     // Start near the "outer" end of the path
     this.theta = maxTheta * START_THETA_FACTOR;
+    this.prevTheta = this.theta;
     this.rVel = 0;
     this.jumpStrength = -6; // inward impulse
     this.onGround = false;
     this.radius = 14;
     this.coyoteFrames = 0;
+    this.movingDir = 0; // -1 left, 1 right, 0 idle
 
     const initialR = platformR(this.theta);
     this.r = initialR;
@@ -115,7 +117,10 @@ class Player {
 
   update() {
     const gravity = 0.18; // radial outward acceleration
-    const runSpeed = 0.07;
+    const runSpeed = 0.035; // slowed down for a less frantic pace
+
+    // Track previous theta for movement direction
+    this.prevTheta = this.theta;
 
     // Angular movement: LEFT/RIGHT run along the curve
     if (keyIsDown(LEFT_ARROW)) {
@@ -127,6 +132,12 @@ class Player {
 
     // Clamp theta within spiral limits
     this.theta = constrain(this.theta, 0, maxTheta);
+
+    // Determine movement direction for animation
+    const deltaTheta = this.theta - this.prevTheta;
+    if (deltaTheta > 0.0001) this.movingDir = 1;
+    else if (deltaTheta < -0.0001) this.movingDir = -1;
+    else this.movingDir = 0;
 
     // Apply radial gravity (outward)
     this.rVel += gravity;
@@ -188,29 +199,110 @@ class Player {
 
   draw() {
     const outline = 3;
-    const body = color(255, 230, 150);
-    const eye = color(0);
+
+    const bodyColor = color(90, 180, 255); // blue coat
+    const bellyColor = color(240, 245, 255);
+    const skinColor = color(255, 225, 190);
+    const eyeColor = color(0);
+    const accentColor = color(255, 215, 120); // time-belt / gadget
+
+    const isRunning = this.onGround && this.movingDir !== 0;
+    const isAirborne = !this.onGround;
+
+    const t = frameCount * 0.25; // animation phase
 
     push();
     translate(this.x, this.y);
+
+    // Tilt a little in direction of motion when running
+    if (isRunning) {
+      rotate(this.movingDir * 0.12);
+    }
+
+    // Slight lift when airborne
+    if (isAirborne) {
+      translate(0, -2);
+    }
+
+    // Shadow
     noStroke();
+    fill(0, 60);
+    ellipse(0, 8, 20, 6);
 
-    // Body
-    fill(body);
+    // LEGS (behind body)
+    stroke(0);
+    strokeWeight(3);
+    strokeCap(ROUND);
+    noFill();
+    let legSwing = isRunning ? 4 * Math.sin(t) : 0;
+    let legSpread = 4;
+
+    // Left leg
+    line(-legSpread - legSwing, 4, -legSpread - legSwing, 14);
+    // Right leg
+    line(legSpread + legSwing, 4, legSpread + legSwing, 14);
+
+    // BODY (chubby coat)
+    noStroke();
+    fill(bodyColor);
     rectMode(CENTER);
-    rect(0, -8, 18, 26, 3);
+    rect(0, -4, 20, 22, 6);
 
-    // Head
-    rect(0, -24, 14, 10, 2);
-    fill(eye);
-    rect(-3, -24, 3, 3, 1);
+    // Belly / chest panel
+    fill(bellyColor);
+    rect(0, -2, 12, 14, 4);
 
-    // Outline for pop
+    // Time-belt / gadget
+    fill(accentColor);
+    rect(0, 4, 16, 4, 3);
+    fill(0);
+    ellipse(0, 4, 6, 6); // little "clock" in the center
+
+    // ARMS
+    stroke(0);
+    strokeWeight(3);
+    strokeCap(ROUND);
+    noFill();
+    let armSwing = isRunning ? 4 * Math.sin(t + Math.PI / 2) : 0;
+
+    // Left arm
+    line(-10 + armSwing, -6, -16 + armSwing, -2);
+    // Right arm
+    line(10 + armSwing, -6, 16 + armSwing, -2);
+
+    // HEAD
+    noStroke();
+    fill(skinColor);
+    ellipse(0, -16, 16, 14); // roundish head
+
+    // Goggles / hair band
+    fill(bodyColor);
+    rect(0, -16, 18, 4, 2);
+
+    // Eyes
+    fill(eyeColor);
+    ellipse(-3, -16, 3, 3);
+    ellipse(3, -16, 3, 3);
+
+    // Tiny smile
+    stroke(0);
+    strokeWeight(1.5);
+    noFill();
+    arc(0, -12, 6, 4, 0, Math.PI);
+
+    // Little top-hat brim (time traveller vibe)
+    noStroke();
+    fill(bodyColor);
+    rect(0, -20, 14, 3, 1);
+    fill(accentColor);
+    rect(0, -22, 10, 6, 2);
+
+    // Outline around main body+head to help pop
     noFill();
     stroke(0);
     strokeWeight(outline);
-    rect(0, -8, 18, 26, 3);
-    rect(0, -24, 14, 10, 2);
+    rect(0, -4, 20, 22, 6);
+    ellipse(0, -16, 16, 14);
 
     pop();
   }
@@ -223,7 +315,7 @@ class Enemy {
     this.theta = theta;
     this.offset = offset;
     this.dir = random([1, -1]);
-    this.baseSpeed = random(0.01, 0.03);
+    this.baseSpeed = random(0.005, 0.015);
     this.speed = this.baseSpeed * this.dir;
   }
 
