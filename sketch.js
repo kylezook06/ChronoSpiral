@@ -314,10 +314,19 @@ const levels = [
 const BOSS_LEVEL_INDEX = levels.length - 1;
 const BOSS_SHARD_GOAL = 60;
 const DOUBLE_JUMP_SHARD_THRESHOLD = 30;
+const INVULN_SHARD_THRESHOLD = 15;
+const FREEZE_SHARD_THRESHOLD = 45;
+const INVULN_DURATION = 60; // frames
+const FREEZE_DURATION = 120; // frames
+const POWER_COOLDOWN = 60 * 60; // 60 seconds at 60fps
 
 const enemies = [];
 const shards = [];
 let globalShardTotal = 0;
+let invulnFrames = 0;
+let freezeFrames = 0;
+let invulnCooldown = 0;
+let freezeCooldown = 0;
 
 // --- Helpers for current level & platform curve ---
 
@@ -327,6 +336,29 @@ function currentLevelObj() {
 
 function platformR(theta) {
   return currentLevelObj().platformCurve(theta);
+}
+
+// Find the closest inner spiral ring along the same radial direction.
+// Returns {theta, r} or null when nothing suitable is found.
+function findInnerRing(theta, currentR) {
+  const baseAngle = ((theta % TWO_PI) + TWO_PI) % TWO_PI;
+
+  let best = null;
+  let bestDiff = Infinity;
+  const maxJumpGap = 80; // maximum inward snap distance
+
+  for (let t = baseAngle; t <= maxTheta; t += TWO_PI) {
+    const ringR = platformR(t);
+    if (ringR < currentR) {
+      const diff = currentR - ringR;
+      if (diff < maxJumpGap && diff < bestDiff) {
+        bestDiff = diff;
+        best = { theta: t, r: ringR };
+      }
+    }
+  }
+
+  return best;
 }
 
 // --- Player ---
@@ -347,6 +379,7 @@ class Player {
     this.airJumpUsed = false;
     this.jumpHeld = false;
     this.downHeld = false;
+    this.seekingInnerRing = false;
 
     // Drop animation state
     this.dropAnimating = false;
@@ -413,6 +446,7 @@ class Player {
 
     // Track previous theta for movement direction
     this.prevTheta = this.theta;
+    this.seekingInnerRing = false;
 
     // Angular movement: LEFT/RIGHT run along the curve
     let desiredTheta = this.theta;
@@ -497,6 +531,7 @@ class Player {
       // Air jump only after earning enough shards
       this.rVel = this.jumpStrength * 1.6;
       this.airJumpUsed = true;
+      this.seekingInnerRing = true;
       currentR += this.rVel;
     }
 
@@ -507,6 +542,21 @@ class Player {
         this.downHeld = downKeyDown;
         return;
       }
+    }
+
+    // If we just used an air jump, try to snap to the nearest inner ring along this radial line
+    if (this.seekingInnerRing) {
+      const innerRing = findInnerRing(this.theta, currentR);
+      if (innerRing) {
+        this.theta = innerRing.theta;
+        currentR = innerRing.r;
+        this.rVel = 0;
+        this.onGround = true;
+        this.coyoteFrames = 6;
+        this.doubleJumpReady = globalShardTotal >= DOUBLE_JUMP_SHARD_THRESHOLD;
+        this.airJumpUsed = false;
+      }
+      this.seekingInnerRing = false;
     }
 
     this.jumpHeld = jumpKeyDown;
@@ -724,6 +774,13 @@ class Player {
     rect(0, -4, 20, 22, 6);
     ellipse(0, -16, 16, 14);
 
+    if (invulnFrames > 0) {
+      noFill();
+      stroke(120, 255, 220, 200);
+      strokeWeight(3);
+      ellipse(0, -4, 32, 32);
+    }
+
     pop();
   }
 }
@@ -774,7 +831,7 @@ class Enemy {
     }
 
     const baseR = platformR(this.theta);
-    const laneR = baseR + this.offset;
+    const laneR = baseR + constrain(this.offset, -6, 6);
     let radialWiggle = 0;
 
     // Slight behavior variations per enemy type, kept subtle so feet stay on the ground
@@ -1081,6 +1138,30 @@ function keyPressed() {
   } else if (keyCode === ESCAPE) {
     GAME_STATE = "MAP";
   }
+
+  if (GAME_STATE === "PLAY") {
+    // Invulnerability: S or Ctrl
+    if (
+      (key === "s" || key === "S" || keyCode === CONTROL) &&
+      globalShardTotal >= INVULN_SHARD_THRESHOLD &&
+      invulnCooldown <= 0 &&
+      invulnFrames <= 0
+    ) {
+      invulnFrames = INVULN_DURATION;
+      invulnCooldown = POWER_COOLDOWN;
+    }
+
+    // Time freeze: D
+    if (
+      (key === "d" || key === "D") &&
+      globalShardTotal >= FREEZE_SHARD_THRESHOLD &&
+      freezeCooldown <= 0 &&
+      freezeFrames <= 0
+    ) {
+      freezeFrames = FREEZE_DURATION;
+      freezeCooldown = POWER_COOLDOWN;
+    }
+  }
 }
 
 function draw() {
@@ -1088,6 +1169,11 @@ function draw() {
     drawMapScreen();
     return;
   }
+
+  if (invulnFrames > 0) invulnFrames--;
+  if (freezeFrames > 0) freezeFrames--;
+  if (invulnCooldown > 0) invulnCooldown--;
+  if (freezeCooldown > 0) freezeCooldown--;
 
   const level = currentLevelObj();
   background(level.palette.bg);
@@ -1101,6 +1187,12 @@ function draw() {
     player.update();
   }
   player.draw();
+
+  if (freezeFrames > 0) {
+    noStroke();
+    fill(100, 180, 255, 60);
+    rect(0, 0, width, height);
+  }
 
   drawHUD(level);
 
@@ -1228,11 +1320,13 @@ function drawPortal(level) {
 
 function drawEnemies() {
   enemies.forEach((e) => {
-    e.update();
+    if (freezeFrames <= 0) {
+      e.update();
+    }
     e.draw();
 
     // Simple collision: distance-based
-    if (GAME_STATE === "PLAY") {
+    if (GAME_STATE === "PLAY" && invulnFrames <= 0) {
       const d = dist(player.x, player.y, e.x, e.y);
       const sameLevel = Math.abs(player.r - e.r) <= 18; // require roughly same platform level
       if (sameLevel && d < player.radius + 12) {
@@ -1287,6 +1381,34 @@ function drawHUD(level) {
   const levelShardTotal = shards.length;
   textAlign(LEFT, TOP);
   text(`Time Shards: ${countCollectedInCurrentLevel()} / ${levelShardTotal}`, 14, 100);
+
+  const invReady = globalShardTotal >= INVULN_SHARD_THRESHOLD;
+  const freezeReady = globalShardTotal >= FREEZE_SHARD_THRESHOLD;
+
+  let invStatus = `Invuln: locked (need ${INVULN_SHARD_THRESHOLD})`;
+  if (invReady) {
+    if (invulnFrames > 0) {
+      invStatus = `Invuln: active (${Math.ceil(invulnFrames / 60)}s)`;
+    } else if (invulnCooldown > 0) {
+      invStatus = `Invuln: cooldown (${Math.ceil(invulnCooldown / 60)}s)`;
+    } else {
+      invStatus = "Invuln: ready (S/Ctrl)";
+    }
+  }
+
+  let freezeStatus = `Freeze: locked (need ${FREEZE_SHARD_THRESHOLD})`;
+  if (freezeReady) {
+    if (freezeFrames > 0) {
+      freezeStatus = `Freeze: active (${Math.ceil(freezeFrames / 60)}s)`;
+    } else if (freezeCooldown > 0) {
+      freezeStatus = `Freeze: cooldown (${Math.ceil(freezeCooldown / 60)}s)`;
+    } else {
+      freezeStatus = "Freeze: ready (D)";
+    }
+  }
+
+  text(invStatus, 14, 116);
+  text(freezeStatus, 14, 132);
 }
 
 // --- Level / game flow ---
