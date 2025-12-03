@@ -348,6 +348,15 @@ class Player {
     this.jumpHeld = false;
     this.downHeld = false;
 
+    // Drop animation state
+    this.dropAnimating = false;
+    this.dropFromR = 0;
+    this.dropToR = 0;
+    this.dropFromTheta = 0;
+    this.dropToTheta = 0;
+    this.dropAnimFrames = 16;
+    this.dropAnimTimer = 0;
+
     const initialR = platformR(this.theta);
     this.r = initialR;
     this.x = centerX + initialR * Math.cos(this.theta);
@@ -358,6 +367,49 @@ class Player {
     const level = currentLevelObj();
     const gravity = 0.22 * (level.difficulty?.gravityScale ?? 1); // radial outward acceleration
     const runSpeed = 0.035 * (level.difficulty?.runSpeedScale ?? 1); // scaled per-level pace
+
+    // Handle animated drop tween before normal physics
+    if (this.dropAnimating) {
+      const jumpKeyDown =
+        keyIsDown(88) || keyIsDown(UP_ARROW) || keyIsDown(32); // X, Up, or Space
+      const downKeyDown =
+        keyIsDown(DOWN_ARROW) || keyIsDown(67) || keyIsDown(18) || keyIsDown(90); // Down, C, Alt, Z
+
+      this.jumpHeld = jumpKeyDown;
+      this.downHeld = downKeyDown;
+
+      this.dropAnimTimer--;
+      let t = 1 - this.dropAnimTimer / this.dropAnimFrames;
+      t = constrain(t, 0, 1);
+      const eased = t * t * (3 - 2 * t); // smoothstep
+
+      const theta = this.dropToTheta;
+      const r = lerp(this.dropFromR, this.dropToR, eased);
+
+      this.theta = theta;
+      this.r = r;
+      this.onGround = false;
+      this.rVel = 0;
+      this.coyoteFrames = 0;
+
+      this.x = centerX + r * Math.cos(theta);
+      this.y = centerY + r * Math.sin(theta);
+
+      if (this.dropAnimTimer <= 0) {
+        this.dropAnimating = false;
+
+        const targetR = platformR(theta);
+        this.r = targetR;
+        this.x = centerX + targetR * Math.cos(theta);
+        this.y = centerY + targetR * Math.sin(theta);
+
+        this.onGround = true;
+        this.coyoteFrames = 6;
+        this.airJumpUsed = false;
+      }
+
+      return; // skip normal physics while tweening
+    }
 
     // Track previous theta for movement direction
     this.prevTheta = this.theta;
@@ -505,15 +557,17 @@ class Player {
 
     if (bestTheta === null) return false;
 
-    this.theta = bestTheta;
-    this.r = bestR;
-    this.rVel = 0;
-    this.onGround = true;
-    this.coyoteFrames = 6;
-    this.airJumpUsed = false;
+    this.dropAnimating = true;
+    this.dropFromR = currentR;
+    this.dropToR = bestR;
+    this.dropFromTheta = this.theta;
+    this.dropToTheta = bestTheta;
+    this.dropAnimTimer = this.dropAnimFrames;
 
-    this.x = centerX + bestR * Math.cos(bestTheta);
-    this.y = centerY + bestR * Math.sin(bestTheta);
+    this.onGround = false;
+    this.rVel = 0;
+    this.coyoteFrames = 0;
+    this.airJumpUsed = false;
 
     return true;
   }
@@ -552,6 +606,25 @@ class Player {
 
     // --- ALIGN FEET OUTWARD ---
     rotate(radialAngle - HALF_PI);
+
+    // Drop dust / warp trails
+    if (this.dropAnimating) {
+      const progress = 1 - this.dropAnimTimer / this.dropAnimFrames;
+      const alpha = 120 * (1 - progress);
+
+      noStroke();
+      fill(255, 255, 255, alpha);
+      const baseY = 12;
+      for (let i = -1; i <= 1; i++) {
+        const px = i * 5;
+        const py = baseY + 4 + progress * 6;
+        ellipse(px, py, 4 + progress * 2, 4 + progress * 2);
+      }
+
+      fill(180, 240, 255, alpha);
+      rectMode(CENTER);
+      rect(0, baseY + 2 + progress * 4, 14, 3 + progress * 3, 2);
+    }
 
     // Body bob when running
     if (isRunning) {
