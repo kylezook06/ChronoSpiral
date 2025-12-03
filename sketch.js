@@ -347,8 +347,6 @@ class Player {
     this.airJumpUsed = false;
     this.jumpHeld = false;
     this.downHeld = false;
-    this.droppingThrough = false;
-    this.dropIgnoreR = null;
 
     const initialR = platformR(this.theta);
     this.r = initialR;
@@ -404,22 +402,11 @@ class Player {
     const crossesInnerPlatform = this.rVel < 0 && currentR > targetR && projectedR <= targetR;
     const crossesOuterPlatform = this.rVel > 0 && currentR < targetR && projectedR >= targetR;
 
-    // Re-enable snapping after we've cleared the initial drop distance
-    if (this.droppingThrough && projectedR > this.dropIgnoreR + band && this.rVel >= 0) {
-      this.droppingThrough = false;
-      this.dropIgnoreR = null;
-    }
-    if (this.droppingThrough && !withinBand && this.rVel >= 0) {
-      // Once we've left the band while dropping, resume normal snapping
-      this.droppingThrough = false;
-    }
-    const skipSnap = this.droppingThrough && this.rVel >= 0;
-
     // Snap when landing outward within the band, or when a jump crosses the platform plane
     const shouldSnap =
-      (withinBand && this.rVel >= 0 && !skipSnap) ||
+      (withinBand && this.rVel >= 0) ||
       crossesInnerPlatform ||
-      (!this.droppingThrough && crossesOuterPlatform);
+      crossesOuterPlatform;
 
     if (shouldSnap) {
       currentR = targetR;
@@ -462,14 +449,12 @@ class Player {
     }
 
     if (downPressed && this.onGround) {
-      // Drop to an outer platform with a gentle impulse
-      const downwardImpulse = 1.8;
-      this.rVel = Math.max(this.rVel, downwardImpulse);
-      this.coyoteFrames = 0;
-      this.onGround = false;
-      this.droppingThrough = true;
-      this.dropIgnoreR = targetR;
-      currentR += this.rVel;
+      // Attempt to snap to the next visible outer loop; if none exists, do nothing.
+      if (this.snapToOuterSpiral()) {
+        this.jumpHeld = jumpKeyDown;
+        this.downHeld = downKeyDown;
+        return;
+      }
     }
 
     this.jumpHeld = jumpKeyDown;
@@ -496,6 +481,41 @@ class Player {
     if (currentR < 35) {
       warpToNextLevel();
     }
+  }
+
+  snapToOuterSpiral() {
+    // Find the next outer loop of the spiral at the same angular position.
+    const baseTheta = this.theta % TWO_PI;
+    const currentR = this.getR();
+
+    let bestTheta = null;
+    let bestR = null;
+
+    for (let k = 1; k <= 4; k++) {
+      const candidateTheta = baseTheta + TWO_PI * k;
+      if (candidateTheta > maxTheta) break;
+
+      const candidateR = platformR(candidateTheta);
+      if (candidateR > currentR + 25) {
+        bestTheta = candidateTheta;
+        bestR = candidateR;
+        break;
+      }
+    }
+
+    if (bestTheta === null) return false;
+
+    this.theta = bestTheta;
+    this.r = bestR;
+    this.rVel = 0;
+    this.onGround = true;
+    this.coyoteFrames = 6;
+    this.airJumpUsed = false;
+
+    this.x = centerX + bestR * Math.cos(bestTheta);
+    this.y = centerY + bestR * Math.sin(bestTheta);
+
+    return true;
   }
 
   getR() {
