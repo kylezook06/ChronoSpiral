@@ -348,6 +348,7 @@ class Player {
     this.jumpHeld = false;
     this.downHeld = false;
     this.droppingThrough = false;
+    this.dropIgnoreR = null;
 
     const initialR = platformR(this.theta);
     this.r = initialR;
@@ -401,14 +402,26 @@ class Player {
     const projectedR = currentR + this.rVel;
     const withinBand = projectedR >= targetR - band && projectedR <= targetR + band;
     const crossesInnerPlatform = this.rVel < 0 && currentR > targetR && projectedR <= targetR;
+    const crossesOuterPlatform = this.rVel > 0 && currentR < targetR && projectedR >= targetR;
+
+    // Re-enable snapping after we've cleared the initial drop distance
+    if (this.droppingThrough && projectedR > this.dropIgnoreR + band && this.rVel >= 0) {
+      this.droppingThrough = false;
+      this.dropIgnoreR = null;
+    }
     if (this.droppingThrough && !withinBand && this.rVel >= 0) {
       // Once we've left the band while dropping, resume normal snapping
       this.droppingThrough = false;
     }
     const skipSnap = this.droppingThrough && this.rVel >= 0;
 
-    // Snap when landing outward within the band, or when an inward jump crosses the platform plane
-    if ((withinBand && this.rVel >= 0 && !skipSnap) || crossesInnerPlatform) {
+    // Snap when landing outward within the band, or when a jump crosses the platform plane
+    const shouldSnap =
+      (withinBand && this.rVel >= 0 && !skipSnap) ||
+      crossesInnerPlatform ||
+      (!this.droppingThrough && crossesOuterPlatform);
+
+    if (shouldSnap) {
       currentR = targetR;
       this.rVel = 0;
       this.onGround = true;
@@ -455,6 +468,7 @@ class Player {
       this.coyoteFrames = 0;
       this.onGround = false;
       this.droppingThrough = true;
+      this.dropIgnoreR = targetR;
       currentR += this.rVel;
     }
 
@@ -666,51 +680,41 @@ class Enemy {
       turned = true;
     }
 
-    let baseR = platformR(this.theta);
-    let radius = baseR + this.offset;
+    const baseR = platformR(this.theta);
+    const laneR = baseR + this.offset;
+    let radialWiggle = 0;
 
-    // Slight behavior variations per enemy type
+    // Slight behavior variations per enemy type, kept subtle so feet stay on the ground
     if (level.enemyType === "scarab") {
-      // scarabs wiggle slightly radial
-      radius += 8 * Math.sin(frameCount * 0.2 + this.theta);
+      radialWiggle = 6 * Math.sin(frameCount * 0.2 + this.theta);
     } else if (level.enemyType === "lotusOrb") {
-      // orbs float in and out gently
-      radius += 6 * Math.sin(frameCount * 0.15 + this.theta * 0.5);
+      radialWiggle = 4 * Math.sin(frameCount * 0.15 + this.theta * 0.5);
     } else if (level.enemyType === "lanternSpirit") {
-      // lantern spirits bob and sway
-      radius += 10 * Math.sin(frameCount * 0.17 + this.theta * 0.35);
-      radius += 4 * Math.sin(frameCount * 0.11 + this.offset * 0.2);
+      radialWiggle = 6 * Math.sin(frameCount * 0.17 + this.theta * 0.35);
+      radialWiggle += 3 * Math.sin(frameCount * 0.11 + this.offset * 0.2);
     } else if (level.enemyType === "legionary") {
-      // disciplined snap outward on turns and steady march ripple
       if (turned) {
-        radius += 8;
+        radialWiggle += 4;
       }
-      radius += 4 * Math.sin(frameCount * 0.3 + this.theta);
+      radialWiggle += 3 * Math.sin(frameCount * 0.3 + this.theta);
     } else if (level.enemyType === "frKnight") {
-      // slight radial lunge as they gallop
-      radius += 4 * Math.sin(frameCount * 0.18 + this.theta);
+      radialWiggle = 3 * Math.sin(frameCount * 0.18 + this.theta);
     } else if (level.enemyType === "itInventor") {
-      // tinkering wobble
-      radius += 5 * Math.sin(frameCount * 0.22 + this.theta * 0.5);
-    } else if (level.enemyType === "britMusketeer") {
-      // steady march, no extra wobble
+      radialWiggle = 4 * Math.sin(frameCount * 0.22 + this.theta * 0.5);
     } else if (level.enemyType === "usSkater") {
-      // tiny radial bounce for skaters
-      radius += 3 * Math.sin(frameCount * 0.4 + this.theta);
+      radialWiggle = 3 * Math.sin(frameCount * 0.4 + this.theta);
     } else if (level.enemyType === "jpMech") {
-      // fast jittery pulse
-      radius += 4 * Math.sin(frameCount * 0.35 + this.theta * 1.2);
+      radialWiggle = 4 * Math.sin(frameCount * 0.35 + this.theta * 1.2);
     } else if (level.enemyType === "bossChaos") {
-      // chaotic pulsing for the final stage
-      radius += 12 * Math.sin(frameCount * 0.2 + this.theta * 1.4);
-      radius += 8 * Math.sin(frameCount * 0.07 + this.offset);
-    } else if (level.enemyType === "hoplite") {
-      // hoplite phantoms use the boosted speed already
-      // no radial change
+      radialWiggle = 10 * Math.sin(frameCount * 0.2 + this.theta * 1.2);
+      radialWiggle += 6 * Math.sin(frameCount * 0.07 + this.offset);
     } else if (level.enemyType === "ikon") {
-      // icons pulse softly outward
-      radius += 6 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
+      radialWiggle = 4 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
     }
+
+    // Keep enemies attached to the platform lane with a small wiggle allowance
+    const clampBand = 10;
+    const radius = constrain(laneR + radialWiggle, laneR - clampBand, laneR + clampBand);
 
     this.x = centerX + radius * Math.cos(this.theta);
     this.y = centerY + radius * Math.sin(this.theta);
