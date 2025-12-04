@@ -336,34 +336,20 @@ const levels = [
     enemyCount: 1,
     enemyOffsets: [0],
     shardCount: 0,
-    difficulty: { gravityScale: 1.4, runSpeedScale: 1.32, enemySpeedScale: 1.6 },
+    difficulty: { gravityScale: -1.2, runSpeedScale: 1.32, enemySpeedScale: 1.6 },
+    isCoreBossLevel: true,
+    bossDurationFrames: 60 * 60,
+    bossMaxPull: 220,
     platformCurve: (theta) => {
       const base = spiralA * theta;
       const ripple = 34 * Math.sin(2.2 * theta + Math.sin(theta));
-      return base + ripple;
+      return Math.max(0, base + ripple - bossPullOffset);
     },
-  },
-  {
-    name: "??? Secret Bonus",
-    year: "???",
-    location: "Hidden Timeline",
-    palette: {
-      bg: [0, 0, 0],
-      spiral: [180, 180, 255],
-      portal: [255, 255, 255],
-    },
-    musicHint: "To be discovered...",
-    enemyTint: [255, 255, 255],
-    enemyType: "none",
-    enemyCount: 0,
-    enemyOffsets: [],
-    shardCount: 0,
-    isSecretBonus: true,
-    platformCurve: (theta) => spiralA * theta,
   },
 ];
 
-const BOSS_LEVEL_INDEX = levels.length - 2; // Time Warden
+const CHRONO_CORE_INDEX = levels.length - 2; // Final Stage — Chrono Core
+const BOSS_LEVEL_INDEX = levels.length - 1; // Time Warden
 const BOSS_SHARD_GOAL = 60;
 const DOUBLE_JUMP_SHARD_THRESHOLD = 30;
 const INVULN_SHARD_THRESHOLD = 15;
@@ -382,6 +368,8 @@ let freezeCooldown = 0;
 let pulseActive = false;
 let pulseHeadTheta = 0;
 let pulseCooldown = 0;
+let bossPullOffset = 0;
+let bossDurationTotal = LEVEL_TIME_LIMIT_FRAMES;
 
 // --- Helpers for current level & platform curve ---
 
@@ -677,7 +665,8 @@ class Player {
     this.r = currentR;
 
     // Warp trigger: close enough to center
-    if (currentR < 35) {
+    const currentStage = currentLevelObj();
+    if (currentR < 35 && !currentStage.isCoreBossLevel) {
       warpToNextLevel();
     }
   }
@@ -1254,8 +1243,8 @@ function setup() {
   centerX = width / 2;
   centerY = height / 2;
 
-  // All eras are playable from the start except the boss and secret bonus
-  unlockedLevels = levels.map((level, i) => i !== BOSS_LEVEL_INDEX && !level.isSecretBonus);
+  // All eras are playable from the start except the Chaos Core and final boss
+  unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
   selectedLevelIndex = 0;
 
   player = new Player();
@@ -1323,6 +1312,10 @@ function draw() {
   const level = currentLevelObj();
   background(level.palette.bg);
 
+  if (level.isCoreBossLevel) {
+    updateBossPull(level);
+  }
+
   drawPortal(level);
   drawSpiral(level);
   updateAndDrawPulse(level);
@@ -1331,7 +1324,12 @@ function draw() {
 
   if (GAME_STATE === "PLAY") {
     levelTimeFramesRemaining--;
-    if (levelTimeFramesRemaining <= 0) {
+    if (level.isCoreBossLevel) {
+      if (levelTimeFramesRemaining <= 0) {
+        handleBossVictory();
+        return;
+      }
+    } else if (levelTimeFramesRemaining <= 0) {
       handleLevelTimeout();
       return;
     }
@@ -1361,7 +1359,7 @@ function drawMapScreen() {
   textSize(14);
   text("LEFT/RIGHT: choose • ENTER: travel • ESC: exit level", width / 2, 70);
   text(
-    `Time Shards: ${globalShardTotal}  •  Boss unlock at ${BOSS_SHARD_GOAL}`,
+    `Time Shards: ${globalShardTotal}  •  Chaos Core unlock at ${BOSS_SHARD_GOAL}`,
     width / 2,
     90
   );
@@ -1398,10 +1396,10 @@ function drawMapScreen() {
 
     if (!isUnlocked) {
       let lockLabel = "(locked)";
-      if (i === BOSS_LEVEL_INDEX) {
+      if (i === CHRONO_CORE_INDEX) {
         lockLabel = `(Need ${BOSS_SHARD_GOAL} shards)`;
-      } else if (levels[i].isSecretBonus) {
-        lockLabel = "(secret)";
+      } else if (i === BOSS_LEVEL_INDEX) {
+        lockLabel = "(Defeat Chaos Core)";
       }
       text(lockLabel, x, labelBottom + 2);
     }
@@ -1535,6 +1533,18 @@ function updateAndDrawPulse(level) {
   }
 }
 
+function updateBossPull(level) {
+  if (!level.isCoreBossLevel) {
+    bossPullOffset = 0;
+    return;
+  }
+
+  const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
+  const progress = 1 - levelTimeFramesRemaining / total;
+  const maxPull = level.bossMaxPull || 200;
+  bossPullOffset = constrain(maxPull * progress, 0, maxPull);
+}
+
 function drawEnemies() {
   enemies.forEach((e) => {
     if (freezeFrames <= 0) {
@@ -1564,7 +1574,7 @@ function drawShards() {
         s.collected = true;
         globalShardTotal++;
         shardsEarnedThisRun++;
-        checkBossUnlock();
+        checkChronoCoreUnlock();
       }
     }
   });
@@ -1640,27 +1650,23 @@ function drawHUD(level) {
 
 function warpToNextLevel() {
   const level = currentLevelObj();
-  if (level.isPulseLevel) {
-    checkBossUnlock();
-    if (unlockedLevels[BOSS_LEVEL_INDEX]) {
-      startLevel(BOSS_LEVEL_INDEX);
-    } else {
-      GAME_STATE = "MAP";
-    }
+  if (level.isPulseLevel && currentLevel === CHRONO_CORE_INDEX) {
+    unlockedLevels[BOSS_LEVEL_INDEX] = true;
+    selectedLevelIndex = BOSS_LEVEL_INDEX;
+    startLevel(BOSS_LEVEL_INDEX);
     return;
   }
 
   const next = Math.min(currentLevel + 1, levels.length - 1);
-  const nextLevel = levels[next];
-  if (nextLevel.isSecretBonus) {
+  if (next === CHRONO_CORE_INDEX && globalShardTotal < BOSS_SHARD_GOAL) {
+    checkChronoCoreUnlock();
     GAME_STATE = "MAP";
     return;
   }
-
   if (next !== currentLevel && !unlockedLevels[next]) {
     unlockedLevels[next] = true;
   }
-  checkBossUnlock();
+  checkChronoCoreUnlock();
   selectedLevelIndex = unlockedLevels[next] ? next : selectedLevelIndex;
   GAME_STATE = "MAP";
 }
@@ -1676,9 +1682,13 @@ function startLevel(idx) {
   resetPlayerToStart();
   generateEnemies();
   generateShards();
-  levelTimeFramesRemaining = LEVEL_TIME_LIMIT_FRAMES;
-  shardsEarnedThisRun = 0;
+  bossPullOffset = 0;
   const level = levels[idx];
+  bossDurationTotal = level.isCoreBossLevel
+    ? level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES
+    : LEVEL_TIME_LIMIT_FRAMES;
+  levelTimeFramesRemaining = bossDurationTotal;
+  shardsEarnedThisRun = 0;
   if (level.isPulseLevel) {
     pulseActive = false;
     pulseHeadTheta = 0;
@@ -1690,6 +1700,12 @@ function startLevel(idx) {
 
 function handleLevelTimeout() {
   globalShardTotal = Math.max(0, globalShardTotal - shardsEarnedThisRun);
+  shardsEarnedThisRun = 0;
+  GAME_STATE = "MAP";
+}
+
+function handleBossVictory() {
+  bossPullOffset = 0;
   shardsEarnedThisRun = 0;
   GAME_STATE = "MAP";
 }
@@ -1728,9 +1744,8 @@ function countCollectedInCurrentLevel() {
   return c;
 }
 
-function checkBossUnlock() {
-  if (!unlockedLevels[BOSS_LEVEL_INDEX] && globalShardTotal >= BOSS_SHARD_GOAL) {
-    unlockedLevels[BOSS_LEVEL_INDEX] = true;
-    selectedLevelIndex = BOSS_LEVEL_INDEX;
+function checkChronoCoreUnlock() {
+  if (!unlockedLevels[CHRONO_CORE_INDEX] && globalShardTotal >= BOSS_SHARD_GOAL) {
+    unlockedLevels[CHRONO_CORE_INDEX] = true;
   }
 }

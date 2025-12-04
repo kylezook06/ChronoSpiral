@@ -13,17 +13,18 @@ A p5.js (1.11.x) playground for a radial, Donkey-Kong-inspired platformer with o
 
 - Each era defines its own platform curve (spiral → lotus waves → stepped tiers → star spikes) so the player, enemies, and collectibles hug era-specific geometry.
 - Levels cycle through era themes (Neanderthal → Ancient India → Ancient Egypt → Ancient Greece → Ancient Rome → Medieval China → Byzantine Empire → Medieval France → Renaissance Italy → 17th Century Britain → Modern America → Future Japan → Chrono Core → Chrono Boss) with color palettes, enemy silhouettes, and shard counts to hint at future art/sound direction.
+- Chrono Core (Stage 13) stays locked until you gather 60 shards; clearing it unlocks the Chrono Boss (Stage 14), a one-minute survival where gravity flips inward and the spiral is pulled toward the core.
 - The player is simulated in polar coordinates (r, θ) so gravity pushes outward and the curve acts as the main platform; reaching the center warps you forward, drifting too far outward resets you to the start, and falling into enemies does the same.
 - Hazards and collectibles move or sit along the curve with slight radial offsets; touching an enemy resets your position while grabbing Time Shards increases the level shard count.
 - Era enemies stay glued to their platform lanes (feet outward) so you can’t sneak under or over their path; shard pickups fuel powers: **15 shards** unlock a brief invulnerability shield and **45 shards** unlock a time-freeze burst.
 - The playable hero is now a chubby, goggle-wearing time traveler with stronger run/jump animation, radial shadow, outward-facing orientation, and animated snap drops/climb-ups between rings; both the player and enemies run at calmer speeds for a more readable pace.
 - The canvas resizes to fill the browser window and recenters the spiral so you can play at any resolution.
-- A full-screen Era Select map lets you choose any unlocked era and see shard progress; each stage opens with a short intro card (era + year/location), and collecting **60 shards** globally unlocks the Chrono Boss node non-linearly. A secret bonus node remains locked for future use.
+- A full-screen Era Select map lets you choose any unlocked era and see shard progress; each stage opens with a short intro card (era + year/location). Collecting **60 shards** globally unlocks the **Chrono Core** (Stage 13); defeating it unlocks the final **Chrono Boss** arena (Stage 14).
 
 ## ChronoSpiral 1.0 roadmap (current pass)
 
 1. **Content expansion**
-   - Add new stages with bespoke curves/enemies: Ancient Rome (tiered colosseum arches), Medieval China (crenellated wall), Byzantine Empire (dome bulges), Medieval France (gothic arches), Renaissance Italy (layered Da Vinci waves), 17th Century Britain (rolling sea wobble), Modern America (freeway ramps), Future Japan (neon spikes), Chrono Core pulse run, Chrono Boss, and a secret bonus placeholder.
+   - Add new stages with bespoke curves/enemies: Ancient Rome (tiered colosseum arches), Medieval China (crenellated wall), Byzantine Empire (dome bulges), Medieval France (gothic arches), Renaissance Italy (layered Da Vinci waves), 17th Century Britain (rolling sea wobble), Modern America (freeway ramps), Future Japan (neon spikes), Chrono Core pulse run, and a pulling/gravity-flip Chrono Boss arena.
 2. **Light systems pass**
    - Per-level difficulty scalars (gravity/run/enemy speed) to ramp intensity without rewriting core movement.
    - Optional shard gating for warps (collect all shards to advance).
