@@ -1,4 +1,4 @@
-// ChronoSpiral: Radial Donkey-Kong-inspired prototype
+// ChronoSpiral: Radial time-travel platformer prototype
 // p5.js 1.11.x
 
 const CANVAS_W = 960; // kept as legacy, not used for createCanvas
@@ -356,7 +356,8 @@ const INVULN_SHARD_THRESHOLD = 15;
 const FREEZE_SHARD_THRESHOLD = 45;
 const INVULN_DURATION = 60; // frames
 const FREEZE_DURATION = 120; // frames
-const POWER_COOLDOWN = 60 * 60; // 60 seconds at 60fps
+const INVULN_COOLDOWN_FRAMES = 15 * 60; // 15 seconds at 60fps
+const FREEZE_COOLDOWN_FRAMES = 30 * 60; // 30 seconds at 60fps
 
 const enemies = [];
 const shards = [];
@@ -1298,7 +1299,7 @@ function keyPressed() {
       invulnFrames <= 0
     ) {
       invulnFrames = INVULN_DURATION;
-      invulnCooldown = POWER_COOLDOWN;
+      invulnCooldown = INVULN_COOLDOWN_FRAMES;
     }
 
     // Time freeze: D
@@ -1309,7 +1310,7 @@ function keyPressed() {
       freezeFrames <= 0
     ) {
       freezeFrames = FREEZE_DURATION;
-      freezeCooldown = POWER_COOLDOWN;
+      freezeCooldown = FREEZE_COOLDOWN_FRAMES;
     }
   }
 }
