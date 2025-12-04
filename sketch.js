@@ -418,6 +418,7 @@ class Player {
     this.radius = 14;
     this.coyoteFrames = 0;
     this.movingDir = 0; // -1 left, 1 right, 0 idle
+    this.facingDir = 1; // remembered facing when idle
     this.doubleJumpReady = false;
     this.airJumpUsed = false;
     this.jumpHeld = false;
@@ -564,9 +565,15 @@ class Player {
 
     // Determine movement direction for animation
     const deltaTheta = this.theta - this.prevTheta;
-    if (deltaTheta > 0.0001) this.movingDir = 1;
-    else if (deltaTheta < -0.0001) this.movingDir = -1;
-    else this.movingDir = 0;
+    if (deltaTheta > 0.0001) {
+      this.movingDir = 1;
+      this.facingDir = 1;
+    } else if (deltaTheta < -0.0001) {
+      this.movingDir = -1;
+      this.facingDir = -1;
+    } else {
+      this.movingDir = 0;
+    }
 
     // Apply radial gravity (outward)
     this.rVel += gravity;
@@ -652,11 +659,15 @@ class Player {
       this.rVel = this.maxOutwardSpeed;
     }
 
-    // Check for falling off the outer edge: if too far beyond the outer radius, reset
-    const outerLimit = platformR(maxTheta) + 80;
-    if (currentR > outerLimit) {
-      resetPlayerToStart();
-      return;
+    // On the core boss stage we let the spiral feel endless; otherwise, falling far
+    // past the outer edge resets the player.
+    const stage = currentLevelObj();
+    if (!stage.isCoreBossLevel) {
+      const outerLimit = platformR(maxTheta) + 80;
+      if (currentR > outerLimit) {
+        resetPlayerToStart();
+        return;
+      }
     }
 
     // Update position from polar
@@ -756,6 +767,11 @@ class Player {
 
     // --- ALIGN FEET OUTWARD ---
     rotate(radialAngle - HALF_PI);
+
+    // Flip sprite so he faces the last movement direction along the tangent
+    if (this.facingDir < 0) {
+      scale(-1, 1);
+    }
 
     // Climb pose: crouch then pop up during inner-ring hop
     let climbPhase = 0;
@@ -1468,11 +1484,16 @@ function drawSpiral(level) {
     const y = centerY + r * Math.sin(t);
 
     if (level.isPulseLevel && isInSafeZone(level, t)) {
-      strokeWeight(10);
+      strokeWeight(12);
+      stroke(
+        Math.min(level.palette.spiral[0] + 40, 255),
+        Math.min(level.palette.spiral[1] + 40, 255),
+        Math.min(level.palette.spiral[2] + 40, 255)
+      );
     } else {
       strokeWeight(4);
+      stroke(level.palette.spiral);
     }
-    stroke(level.palette.spiral);
     vertex(x, y);
   }
   endShape();
@@ -1692,7 +1713,8 @@ function startLevel(idx) {
   if (level.isPulseLevel) {
     pulseActive = false;
     pulseHeadTheta = 0;
-    pulseCooldown = level.pulseIntervalFrames;
+    pulseCooldown = 60; // first pulse quickly
+    level.pulseIntervalFrames = level.pulseIntervalFrames || 10 * 60; // tighten repeat cadence
   }
   introTimer = INTRO_DURATION;
   GAME_STATE = "INTRO";
@@ -1726,12 +1748,15 @@ function generateEnemies() {
 function generateShards() {
   shards.length = 0;
   const level = currentLevelObj();
-  const count = level.shardCount || 6;
+  const count = typeof level.shardCount === "number" ? level.shardCount : 6;
+
+  // Levels with shardCount === 0 intentionally have none (e.g., Chaos Core, Boss)
+  if (count <= 0) return;
 
   for (let i = 0; i < count; i++) {
     const theta = map(i + 0.5, 0, count, 0.8 * Math.PI, maxTheta - 1.5 * Math.PI);
-    // Alternate inner/outer placement around the curve
-    const offset = i % 2 === 0 ? -25 : 25;
+    // Keep shards close to the walkable band so they're reachable
+    const offset = i % 2 === 0 ? -16 : 16;
     shards.push(new TimeShard(theta, offset));
   }
 }
