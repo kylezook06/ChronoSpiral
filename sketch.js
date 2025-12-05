@@ -900,9 +900,10 @@ class Player {
 // --- Enemy ---
 
 class Enemy {
-  constructor(theta, offset) {
+  constructor(theta, offset, subtype = null) {
     this.theta = theta;
     this.offset = offset;
+    this.subtype = subtype;
     this.dir = random([1, -1]);
     this.baseSpeed = random(0.005, 0.015);
     this.speed = this.baseSpeed * this.dir;
@@ -915,26 +916,27 @@ class Enemy {
 
   update() {
     const level = currentLevelObj();
+    const type = this.subtype || level.enemyType;
     const enemySpeedScale = level.difficulty?.enemySpeedScale ?? 1;
     let speedMag = this.baseSpeed * enemySpeedScale;
 
-    if (level.enemyType === "hoplite") {
+    if (type === "hoplite") {
       speedMag *= 1.4;
-    } else if (level.enemyType === "ikon") {
+    } else if (type === "ikon") {
       speedMag *= 0.85;
-    } else if (level.enemyType === "frKnight") {
+    } else if (type === "frKnight") {
       speedMag *= 1.05;
-    } else if (level.enemyType === "itInventor") {
+    } else if (type === "itInventor") {
       speedMag *= 1.05;
-    } else if (level.enemyType === "britMusketeer") {
+    } else if (type === "britMusketeer") {
       speedMag *= 0.9;
-    } else if (level.enemyType === "usSkater") {
+    } else if (type === "usSkater") {
       speedMag *= 1.5;
-    } else if (level.enemyType === "jpMech") {
+    } else if (type === "jpMech") {
       speedMag *= 1.6;
-    } else if (level.enemyType === "bossChaos") {
+    } else if (type === "bossChaos") {
       speedMag *= 1.8;
-    } else if (level.enemyType === "bossWarden") {
+    } else if (type === "bossWarden") {
       speedMag *= 1.7;
     }
 
@@ -964,37 +966,37 @@ class Enemy {
 
     const baseR = platformR(this.theta);
     const laneR = baseR + constrain(this.offset, -6, 6);
-    const groundOffset = level.enemyType === "boulder" ? this.radius * 0.35 : 0;
+    const groundOffset = type === "boulder" ? this.radius * 0.35 : 0;
     let radialWiggle = 0;
 
     // Slight behavior variations per enemy type, kept subtle so feet stay on the ground
-    if (level.enemyType === "scarab") {
+    if (type === "scarab") {
       radialWiggle = 6 * Math.sin(frameCount * 0.2 + this.theta);
-    } else if (level.enemyType === "lotusOrb") {
+    } else if (type === "lotusOrb") {
       radialWiggle = 4 * Math.sin(frameCount * 0.15 + this.theta * 0.5);
-    } else if (level.enemyType === "lanternSpirit") {
+    } else if (type === "lanternSpirit") {
       radialWiggle = 6 * Math.sin(frameCount * 0.17 + this.theta * 0.35);
       radialWiggle += 3 * Math.sin(frameCount * 0.11 + this.offset * 0.2);
-    } else if (level.enemyType === "legionary") {
+    } else if (type === "legionary") {
       if (turned) {
         radialWiggle += 4;
       }
       radialWiggle += 3 * Math.sin(frameCount * 0.3 + this.theta);
-    } else if (level.enemyType === "frKnight") {
+    } else if (type === "frKnight") {
       radialWiggle = 3 * Math.sin(frameCount * 0.18 + this.theta);
-    } else if (level.enemyType === "itInventor") {
+    } else if (type === "itInventor") {
       radialWiggle = 4 * Math.sin(frameCount * 0.22 + this.theta * 0.5);
-    } else if (level.enemyType === "usSkater") {
+    } else if (type === "usSkater") {
       radialWiggle = 3 * Math.sin(frameCount * 0.4 + this.theta);
-    } else if (level.enemyType === "jpMech") {
+    } else if (type === "jpMech") {
       radialWiggle = 4 * Math.sin(frameCount * 0.35 + this.theta * 1.2);
-    } else if (level.enemyType === "bossChaos") {
+    } else if (type === "bossChaos") {
       radialWiggle = 10 * Math.sin(frameCount * 0.2 + this.theta * 1.2);
       radialWiggle += 6 * Math.sin(frameCount * 0.07 + this.offset);
-    } else if (level.enemyType === "bossWarden") {
+    } else if (type === "bossWarden") {
       radialWiggle = 8 * Math.sin(frameCount * 0.16 + this.theta * 1.3);
       radialWiggle += 5 * Math.sin(frameCount * 0.11 + this.offset * 0.6);
-    } else if (level.enemyType === "ikon") {
+    } else if (type === "ikon") {
       radialWiggle = 4 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
     }
 
@@ -1018,6 +1020,7 @@ class Enemy {
 
   draw() {
     const level = currentLevelObj();
+    const type = this.subtype || level.enemyType;
     const tint = level.enemyTint;
     const radialAngle = Math.atan2(this.y - centerY, this.x - centerX);
 
@@ -1035,9 +1038,7 @@ class Enemy {
     // Orient so local +Y points outward from the center (feet away from center)
     rotate(radialAngle - HALF_PI);
 
-    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos"].includes(
-      level.enemyType
-    );
+    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos"].includes(type);
     if (needsFacing && this.facingDir < 0) {
       scale(-1, 1);
     }
@@ -1045,7 +1046,7 @@ class Enemy {
     strokeWeight(3);
     fill(tint[0], tint[1], tint[2]);
 
-    switch (level.enemyType) {
+    switch (type) {
       case "boulder":
         // Angry rolling boulder
         push();
@@ -1823,6 +1824,19 @@ function generateEnemies() {
   const level = currentLevelObj();
   const count = level.enemyCount || 6;
   const offsets = level.enemyOffsets || [-30, -10, 10, 30];
+
+  // Stage 1 mixes Neanderthals with boulders; other stages use their default type
+  if (currentLevel === 0) {
+    const neanderCount = Math.min(2, count);
+
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const offset = random(offsets);
+      const subtype = i < neanderCount ? "neanderthal" : "boulder";
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
 
   for (let i = 0; i < count; i++) {
     const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
