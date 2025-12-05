@@ -36,7 +36,7 @@ const levels = [
     palette: { bg: [12, 12, 28], spiral: [90, 200, 140], portal: [80, 180, 255] },
     musicHint: "Cavern beats, bone clacks",
     enemyTint: [220, 120, 80],
-    enemyType: "boulder",
+    enemyType: "neanderthal",
     enemyCount: 4,
     enemyOffsets: [-20, 20],
     shardCount: 5,
@@ -762,8 +762,13 @@ class Player {
     }
 
     // Anchor the character so local (0,0) is at his feet on the platform
-    const FOOT_ANCHOR = 24;
+    const FOOT_ANCHOR = 26;
     translate(0, -FOOT_ANCHOR);
+
+    // Small lift when airborne
+    if (!this.onGround) {
+      translate(0, -2);
+    }
 
     // Climb pose: crouch then pop up during inner-ring hop
     if (this.climbAnimating) {
@@ -863,9 +868,11 @@ class Player {
     fill(20, 20, 30);
     arc(0, -2, headW, headH, 0, Math.PI, CHORD);
 
+    const eyeOffset = 4;
+    const dirBias = this.facingDir * 1.5;
     fill(0);
-    ellipse(-4, -6, 3, 3);
-    ellipse(4, -6, 3, 3);
+    ellipse(-eyeOffset + dirBias, -6, 3, 3);
+    ellipse(eyeOffset + dirBias, -6, 3, 3);
 
     stroke(0);
     strokeWeight(2);
@@ -1073,6 +1080,49 @@ class Enemy {
         line(2, -4, 7, -6);
         noFill();
         arc(0, 2, 8, 6, 0.2 * Math.PI, 0.8 * Math.PI);
+        pop();
+        break;
+      case "neanderthal":
+        // Club-wielding caveman that faces along the path
+        translate(0, -12);
+
+        // Legs
+        stroke(0);
+        strokeWeight(3);
+        strokeCap(ROUND);
+        line(-3, 10, -3, 16);
+        line(3, 10, 3, 16);
+
+        // Fur tunic
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        rectMode(CENTER);
+        rect(0, 6, 18, 14, 4);
+
+        // Head
+        fill(230, 200, 170);
+        ellipse(0, -2, 14, 16);
+
+        // Brow and single eye toward facing direction
+        stroke(0);
+        strokeWeight(2);
+        line(-6, -6, 2, -7);
+        noStroke();
+        fill(0);
+        ellipse(2, -4, 3, 3);
+
+        // Beard/jawline
+        fill(60, 40, 30);
+        arc(0, 0, 14, 12, 0, Math.PI, CHORD);
+
+        // Stone club behind him
+        push();
+        translate(-8, 2);
+        rotate(-0.6);
+        fill(100, 80, 60);
+        rect(0, 0, 14, 4, 2);
+        fill(80, 60, 40);
+        ellipse(7, 0, 6, 8);
         pop();
         break;
       case "lotusOrb":
