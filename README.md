@@ -8,6 +8,7 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 2. Open `http://localhost:8000` in a browser.
 3. Use **Left/Right** to run along the spiral and **X/Up/Space** to jump inward toward the portal. Press **Down/C/Alt** to snap-drop to the next outer loop. After earning **30 shards** you unlock a mid-air double jump (press jump again while airborne) that now latches onto inner rings with a short climb-up animation. At **15 shards** press **S/Ctrl** for a 1s invulnerability shield (15s cooldown) and at **45 shards** press **D** for a 2s time-freeze (30s cooldown). Tap **Enter** on the Era Select map to start an unlocked stage (first stage starts unlocked). The canvas fills the window, so you can resize the browser at any point.
 4. Each board runs on a **3:00 timer**; if it expires you return to Era Select and lose the shards collected during that run.
+5. For playtesting, press **Ctrl + Shift + Alt + '+'** to instantly grant 60 shards and unlock the last two arenas.
 
 ## Notes
 

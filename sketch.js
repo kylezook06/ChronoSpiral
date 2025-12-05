@@ -1380,6 +1380,16 @@ function windowResized() {
 }
 
 function keyPressed() {
+  const ctrlDown = keyIsDown(CONTROL);
+  const shiftDown = keyIsDown(SHIFT);
+  const altDown = keyIsDown(ALT);
+
+  // Temporary playtest unlock: Ctrl + Shift + Alt + '+'. Grants 60 shards and opens final arenas.
+  if ((key === "+" || key === "=") && ctrlDown && shiftDown && altDown) {
+    grantPlaytestUnlock();
+    return;
+  }
+
   if (GAME_STATE === "MAP") {
     if (keyCode === LEFT_ARROW) {
       selectedLevelIndex = (selectedLevelIndex - 1 + levels.length) % levels.length;
@@ -1893,4 +1903,11 @@ function checkChronoCoreUnlock() {
   if (!unlockedLevels[CHRONO_CORE_INDEX] && globalShardTotal >= BOSS_SHARD_GOAL) {
     unlockedLevels[CHRONO_CORE_INDEX] = true;
   }
+}
+
+function grantPlaytestUnlock() {
+  globalShardTotal = Math.max(globalShardTotal, BOSS_SHARD_GOAL);
+  checkChronoCoreUnlock();
+  unlockedLevels[BOSS_LEVEL_INDEX] = true;
+  selectedLevelIndex = Math.max(selectedLevelIndex, CHRONO_CORE_INDEX);
 }
