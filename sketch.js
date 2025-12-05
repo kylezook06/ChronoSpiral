@@ -739,19 +739,6 @@ class Player {
   }
 
   draw() {
-    const outline = 3;
-
-    const bodyColor = color(90, 180, 255); // blue coat
-    const bellyColor = color(240, 245, 255);
-    const skinColor = color(255, 225, 190);
-    const eyeColor = color(0);
-    const accentColor = color(255, 215, 120); // time-belt / gadget
-
-    const isRunning = this.onGround && this.movingDir !== 0;
-    const isAirborne = !this.onGround;
-
-    const t = frameCount * 0.25; // animation phase
-
     // Angle from center to player (radial outward direction)
     const radialAngle = Math.atan2(this.y - centerY, this.x - centerX);
 
@@ -766,7 +753,7 @@ class Player {
     fill(0, 60);
     ellipse(sx, sy, 20, 6);
 
-    // --- ALIGN FEET OUTWARD ---
+    // Feet point outward
     rotate(radialAngle - HALF_PI);
 
     // Flip sprite so he faces the last movement direction along the tangent
@@ -775,9 +762,8 @@ class Player {
     }
 
     // Climb pose: crouch then pop up during inner-ring hop
-    let climbPhase = 0;
     if (this.climbAnimating) {
-      climbPhase = 1 - this.climbTimer / this.climbFrames;
+      const climbPhase = 1 - this.climbTimer / this.climbFrames;
       const crouch = climbPhase < 0.5
         ? map(climbPhase, 0, 0.5, 1.0, 0.7)
         : map(climbPhase, 0.5, 1, 0.7, 1.0);
@@ -790,121 +776,105 @@ class Player {
 
     // Drop dust / warp trails
     if (this.dropAnimating) {
-      const progress = 1 - this.dropAnimTimer / this.dropAnimFrames;
-      const alpha = 120 * (1 - progress);
+      const progress = 1 - this.dropAnimTimer / this.dropAnimFrames; // 0→1
+      const alpha = 120 * (1 - progress); // fade out
 
       noStroke();
       fill(255, 255, 255, alpha);
-      const baseY = 12;
+
+      const baseY = 12; // around where the feet are
       for (let i = -1; i <= 1; i++) {
         const px = i * 5;
         const py = baseY + 4 + progress * 6;
         ellipse(px, py, 4 + progress * 2, 4 + progress * 2);
       }
 
+      // Optional warp streak directly under feet
       fill(180, 240, 255, alpha);
       rectMode(CENTER);
       rect(0, baseY + 2 + progress * 4, 14, 3 + progress * 3, 2);
     }
 
-    // Body bob when running
-    if (isRunning) {
-      const bob = 1.5 * Math.sin(t * 2);
-      translate(0, bob);
+    // --- chubby bearded runner ---
+    let runCycle = 0;
+    if (this.movingDir !== 0 && this.onGround) {
+      runCycle = (frameCount * 0.35) % TWO_PI;
     }
+    const legSwing = Math.sin(runCycle) * 5;
+    const armSwing = Math.sin(runCycle + Math.PI) * 6;
+    const bob = this.onGround ? Math.sin(runCycle * 2) * 1.5 : 0;
 
-    // Slight lift when airborne
-    if (isAirborne) {
-      translate(0, -2);
-    }
+    translate(0, bob);
 
-    // Extra lean in direction of motion along tangent
-    if (isRunning) {
-      rotate(this.movingDir * 0.18);
-    }
+    const headH = 18;
+    const headW = 16;
+    const bodyW = 18;
+    const bodyH = 16;
+    const legLen = 12;
 
-    // LEGS (behind body)
+    // Legs (yellow boots)
     stroke(0);
     strokeWeight(3);
-    strokeCap(ROUND);
-    noFill();
+    line(-4, 10, -4 + legSwing * 0.4, 10 + legLen);
+    line(4, 10, 4 - legSwing * 0.4, 10 + legLen);
 
-    const legPhase = t * 2;
-    const legAmp = isRunning ? 6 : 0;
-    const legSpread = 4;
-
-    // Left leg
-    let leftSwing = legAmp * Math.sin(legPhase);
-    line(-legSpread, 4, -legSpread + leftSwing, 14);
-    // Right leg (opposite phase)
-    let rightSwing = legAmp * Math.sin(legPhase + Math.PI);
-    line(legSpread, 4, legSpread + rightSwing, 14);
-
-    // BODY (chubby coat)
     noStroke();
-    fill(bodyColor);
+    fill(250, 220, 80);
+    ellipse(-4 + legSwing * 0.4, 10 + legLen + 2, 8, 5);
+    ellipse(4 - legSwing * 0.4, 10 + legLen + 2, 8, 5);
+
+    // Body (blue shirt)
     rectMode(CENTER);
-    rect(0, -4, 20, 22, 6);
+    fill(80, 180, 255);
+    rect(0, 4, bodyW, bodyH, 6);
 
-    // Belly / chest panel
-    fill(bellyColor);
-    rect(0, -2, 12, 14, 4);
+    // Arms
+    push();
+    translate(-bodyW * 0.4, 2);
+    rotate(radians(armSwing * 1.5));
+    fill(80, 180, 255);
+    rect(0, 0, 10, 6, 3);
+    fill(240, 210, 180);
+    ellipse(7, 0, 6, 6);
+    pop();
 
-    // Time-belt / gadget
-    fill(accentColor);
-    rect(0, 4, 16, 4, 3);
+    push();
+    translate(bodyW * 0.4, 2);
+    rotate(radians(-armSwing * 1.5));
+    fill(80, 180, 255);
+    rect(0, 0, 10, 6, 3);
+    fill(240, 210, 180);
+    ellipse(7, 0, 6, 6);
+    pop();
+
+    // Head with beard and hair tufts
+    push();
+    translate(0, -8);
+    fill(20, 20, 30);
+    ellipse(0, -4, headW + 6, headH + 4);
+
+    fill(240, 210, 180);
+    ellipse(0, -4, headW, headH);
+
+    fill(20, 20, 30);
+    arc(0, -2, headW, headH, 0, Math.PI, CHORD);
+
     fill(0);
-    ellipse(0, 4, 6, 6); // little "clock" in the center
+    ellipse(-4, -6, 3, 3);
+    ellipse(4, -6, 3, 3);
 
-    // ARMS
     stroke(0);
+    strokeWeight(2);
+    line(-6, -8, -3, -7);
+    line(3, -7, 6, -8);
+
+    stroke(20, 20, 30);
     strokeWeight(3);
-    strokeCap(ROUND);
-    noFill();
-    const armPhase = t * 2;
-    const armAmp = isRunning ? 6 : 2;
+    line(-3, -14, -3, -18);
+    line(3, -14, 3, -18);
+    pop();
 
-    // Left arm
-    let leftArmSwing = armAmp * Math.sin(armPhase + Math.PI);
-    line(-8, -8, -14 + leftArmSwing, -4);
-    // Right arm
-    let rightArmSwing = armAmp * Math.sin(armPhase);
-    line(8, -8, 14 + rightArmSwing, -4);
-
-    // HEAD
-    noStroke();
-    fill(skinColor);
-    ellipse(0, -16, 16, 14); // roundish head
-
-    // Goggles / hair band
-    fill(bodyColor);
-    rect(0, -16, 18, 4, 2);
-
-    // Eyes
-    fill(eyeColor);
-    ellipse(-3, -16, 3, 3);
-    ellipse(3, -16, 3, 3);
-
-    // Tiny smile
-    stroke(0);
-    strokeWeight(1.5);
-    noFill();
-    arc(0, -12, 6, 4, 0, Math.PI);
-
-    // Little top-hat brim (time traveller vibe)
-    noStroke();
-    fill(bodyColor);
-    rect(0, -20, 14, 3, 1);
-    fill(accentColor);
-    rect(0, -22, 10, 6, 2);
-
-    // Outline around main body+head to help pop
-    noFill();
-    stroke(0);
-    strokeWeight(outline);
-    rect(0, -4, 20, 22, 6);
-    ellipse(0, -16, 16, 14);
-
+    // Invulnerability glow
     if (invulnFrames > 0) {
       noFill();
       stroke(120, 255, 220, 200);
@@ -1034,11 +1004,31 @@ class Enemy {
 
     switch (level.enemyType) {
       case "boulder":
-        // Simple rolling rock
-        ellipse(0, 0, 24, 24);
-        // crack line
+        // Angry rolling boulder
+        noStroke();
+        fill(205, 120, 70);
+        ellipse(0, 0, 26, 26);
+
+        stroke(80, 40, 25);
+        strokeWeight(3);
+        noFill();
+        ellipse(0, 0, 26, 26);
+
+        noStroke();
+        fill(170, 90, 55);
+        ellipse(-5, -4, 2, 2);
+        ellipse(3, -6, 2, 2);
+        ellipse(4, 2, 2, 2);
+
+        fill(0);
+        ellipse(-4, -3, 3, 3);
+        ellipse(4, -3, 3, 3);
         stroke(0);
-        line(-6, -4, 3, 4);
+        strokeWeight(2);
+        line(-7, -6, -2, -4);
+        line(2, -4, 7, -6);
+        noFill();
+        arc(0, 2, 8, 6, 0.2 * Math.PI, 0.8 * Math.PI);
         break;
       case "lotusOrb":
         // Glowing orb / mandala spirit
