@@ -761,6 +761,10 @@ class Player {
       scale(-1, 1);
     }
 
+    // Anchor the character so local (0,0) is at his feet on the platform
+    const FOOT_ANCHOR = 24;
+    translate(0, -FOOT_ANCHOR);
+
     // Climb pose: crouch then pop up during inner-ring hop
     if (this.climbAnimating) {
       const climbPhase = 1 - this.climbTimer / this.climbFrames;
@@ -895,6 +899,11 @@ class Enemy {
     this.dir = random([1, -1]);
     this.baseSpeed = random(0.005, 0.015);
     this.speed = this.baseSpeed * this.dir;
+    this.prevTheta = this.theta;
+    this.movingDir = 0;
+    this.facingDir = 1;
+    this.rollAngle = random(TWO_PI);
+    this.radius = 13;
   }
 
   update() {
@@ -922,6 +931,8 @@ class Enemy {
       speedMag *= 1.7;
     }
 
+    this.prevTheta = this.theta;
+
     const thetaDelta = speedMag * this.dir;
     // Move along the curve
     this.theta = constrain(this.theta + thetaDelta, 0, maxTheta);
@@ -933,8 +944,20 @@ class Enemy {
       turned = true;
     }
 
+    const deltaThetaSigned = this.theta - this.prevTheta;
+    if (deltaThetaSigned > 0.0001) {
+      this.movingDir = 1;
+      this.facingDir = 1;
+    } else if (deltaThetaSigned < -0.0001) {
+      this.movingDir = -1;
+      this.facingDir = -1;
+    } else {
+      this.movingDir = 0;
+    }
+
     const baseR = platformR(this.theta);
     const laneR = baseR + constrain(this.offset, -6, 6);
+    const groundOffset = level.enemyType === "boulder" ? this.radius * 0.35 : 0;
     let radialWiggle = 0;
 
     // Slight behavior variations per enemy type, kept subtle so feet stay on the ground
@@ -970,7 +993,13 @@ class Enemy {
 
     // Keep enemies attached to the platform lane with a small wiggle allowance
     const clampBand = 10;
-    const radius = constrain(laneR + radialWiggle, laneR - clampBand, laneR + clampBand);
+    const radiusBase = laneR + groundOffset;
+    const radius = constrain(radiusBase + radialWiggle, radiusBase - clampBand, radiusBase + clampBand);
+
+    // Track roll based on distance traveled along the curve
+    const pathDistance = Math.abs(deltaThetaSigned) * baseR;
+    const spinDir = deltaThetaSigned >= 0 ? 1 : -1;
+    this.rollAngle = (this.rollAngle + spinDir * (pathDistance / Math.max(this.radius, 1))) % TWO_PI;
 
     this.x = centerX + radius * Math.cos(this.theta);
     this.y = centerY + radius * Math.sin(this.theta);
@@ -998,6 +1027,13 @@ class Enemy {
 
     // Orient so local +Y points outward from the center (feet away from center)
     rotate(radialAngle - HALF_PI);
+
+    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos"].includes(
+      level.enemyType
+    );
+    if (needsFacing && this.facingDir < 0) {
+      scale(-1, 1);
+    }
     stroke(0);
     strokeWeight(3);
     fill(tint[0], tint[1], tint[2]);
@@ -1005,14 +1041,22 @@ class Enemy {
     switch (level.enemyType) {
       case "boulder":
         // Angry rolling boulder
+        push();
+        rotate(this.rollAngle);
+
         noStroke();
         fill(205, 120, 70);
-        ellipse(0, 0, 26, 26);
+        ellipse(0, 0, this.radius * 2, this.radius * 2);
 
         stroke(80, 40, 25);
         strokeWeight(3);
         noFill();
-        ellipse(0, 0, 26, 26);
+        ellipse(0, 0, this.radius * 2, this.radius * 2);
+
+        // Plank/rock lines for roll readability
+        stroke(60, 30, 15);
+        line(-this.radius * 0.8, 0, this.radius * 0.8, 0);
+        line(0, -this.radius * 0.8, 0, this.radius * 0.8);
 
         noStroke();
         fill(170, 90, 55);
@@ -1029,6 +1073,7 @@ class Enemy {
         line(2, -4, 7, -6);
         noFill();
         arc(0, 2, 8, 6, 0.2 * Math.PI, 0.8 * Math.PI);
+        pop();
         break;
       case "lotusOrb":
         // Glowing orb / mandala spirit
