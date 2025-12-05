@@ -660,12 +660,15 @@ class Player {
       this.rVel = this.maxOutwardSpeed;
     }
 
-    // On the core boss stage we let the spiral feel endless; otherwise, falling far
-    // past the outer edge resets the player.
+    // On the core boss stage, clamp to the boundary so the spiral feels endless;
+    // on other stages, falling past the edge resets the player.
     const stage = currentLevelObj();
-    if (!stage.isCoreBossLevel) {
-      const outerLimit = platformR(maxTheta) + 80;
-      if (currentR > outerLimit) {
+    const outerLimit = platformR(maxTheta) + 80;
+    if (currentR > outerLimit) {
+      if (stage.isCoreBossLevel) {
+        currentR = outerLimit;
+        this.rVel = 0;
+      } else {
         resetPlayerToStart();
         return;
       }
