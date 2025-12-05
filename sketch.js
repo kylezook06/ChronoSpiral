@@ -8,7 +8,9 @@ let centerX, centerY;
 
 // Base spiral parameter used by all platform curves
 let spiralA = 12; // tightness of the spiral (r = a * theta)
-let maxTheta = 10 * Math.PI;
+const BASE_MAX_THETA = 10 * Math.PI; // standard stage length
+const BOSS_MAX_THETA = 60 * Math.PI; // effectively endless spiral for the core boss
+let maxTheta = BASE_MAX_THETA;
 
 let player;
 let currentLevel = 0;
@@ -378,6 +380,15 @@ function currentLevelObj() {
   return levels[currentLevel % levels.length];
 }
 
+function updateMaxThetaForCurrentLevel() {
+  const level = currentLevelObj();
+  if (level?.isCoreBossLevel) {
+    maxTheta = BOSS_MAX_THETA;
+  } else {
+    maxTheta = BASE_MAX_THETA;
+  }
+}
+
 function platformR(theta) {
   return currentLevelObj().platformCurve(theta);
 }
@@ -409,8 +420,9 @@ function findInnerRing(theta, currentR) {
 
 class Player {
   constructor() {
-    // Start near the "outer" end of the path
-    this.theta = maxTheta * START_THETA_FACTOR;
+    const level = currentLevelObj();
+    // Start near the center for the core boss, otherwise partway out
+    this.theta = level?.isCoreBossLevel ? 2 * Math.PI : maxTheta * START_THETA_FACTOR;
     this.prevTheta = this.theta;
     this.rVel = 0;
     this.jumpStrength = -4; // toned-down inward impulse
@@ -1353,6 +1365,7 @@ function setup() {
   unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
   selectedLevelIndex = 0;
 
+  updateMaxThetaForCurrentLevel();
   player = new Player();
   generateEnemies();
   generateShards();
@@ -1566,9 +1579,10 @@ function isInSafeZone(level, theta) {
 }
 
 function drawSpiral(level) {
+  const thetaLimit = level?.isCoreBossLevel ? BOSS_MAX_THETA : maxTheta;
   noFill();
   beginShape();
-  for (let t = 0; t <= maxTheta; t += 0.05) {
+  for (let t = 0; t <= thetaLimit; t += 0.05) {
     const r = level.platformCurve(t);
     const x = centerX + r * Math.cos(t);
     const y = centerY + r * Math.sin(t);
@@ -1602,6 +1616,8 @@ function updateAndDrawPulse(level) {
   if (!level.isPulseLevel) return;
   if (GAME_STATE !== "PLAY") return;
 
+  const thetaLimit = level?.isCoreBossLevel ? BOSS_MAX_THETA : maxTheta;
+
   if (!pulseActive) {
     if (pulseCooldown > 0) {
       pulseCooldown--;
@@ -1611,7 +1627,7 @@ function updateAndDrawPulse(level) {
     }
   } else {
     pulseHeadTheta += level.pulseSpeed;
-    if (pulseHeadTheta >= maxTheta) {
+    if (pulseHeadTheta >= thetaLimit) {
       pulseActive = false;
       pulseCooldown = level.pulseIntervalFrames;
     }
@@ -1790,6 +1806,7 @@ function startLevel(idx) {
   currentLevelIndex = idx;
   currentLevel = idx;
   selectedLevelIndex = idx;
+  updateMaxThetaForCurrentLevel();
   resetPlayerToStart();
   generateEnemies();
   generateShards();
