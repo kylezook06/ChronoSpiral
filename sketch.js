@@ -17,10 +17,13 @@ let player;
 let currentLevel = 0;
 let currentLevelIndex = 0;
 
+const MAX_LIVES = 3;
+let lives = MAX_LIVES;
+
 const START_THETA_FACTOR = 0.9; // start near the outer edge
 
 // Game states
-let GAME_STATE = "MAP"; // MAP | INTRO | PLAY
+let GAME_STATE = "MAP"; // MAP | INTRO | PLAY | GAME_OVER
 let introTimer = 0;
 const INTRO_DURATION = 120; // frames (~2 seconds)
 
@@ -730,9 +733,24 @@ class Player {
     this.y = pos.y;
     this.r = currentR;
 
-    // Warp trigger: close enough to center
+    // Stage-specific win/lose triggers
     const currentStage = currentLevelObj();
-    if (currentR < 35 && !currentStage.isCoreBossLevel) {
+    if (currentStage.isCoreBossLevel) {
+      // Reaching the outer exit portal wins the fight
+      const exitTheta = maxTheta - Math.PI * 0.5;
+      const exitR = platformR(exitTheta);
+      const nearExit = this.theta >= exitTheta - 0.3 && Math.abs(currentR - exitR) <= 30;
+      if (nearExit) {
+        handleBossVictory();
+        return;
+      }
+
+      // Falling into the core costs a life
+      if (currentR < 35) {
+        loseLife();
+        return;
+      }
+    } else if (currentR < 35) {
       warpToNextLevel();
     }
   }
@@ -1413,14 +1431,7 @@ function setup() {
   centerX = width / 2;
   centerY = height / 2;
 
-  // All eras are playable from the start except the Chaos Core and final boss
-  unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
-  selectedLevelIndex = 0;
-
-  updateMaxThetaForCurrentLevel();
-  player = new Player();
-  generateEnemies();
-  generateShards();
+  resetRunProgress();
   textFont("Courier New");
   GAME_STATE = "MAP";
 }
@@ -1449,6 +1460,11 @@ function keyPressed() {
       selectedLevelIndex = (selectedLevelIndex + 1) % levels.length;
     } else if ((keyCode === ENTER || keyCode === RETURN) && unlockedLevels[selectedLevelIndex]) {
       startLevel(selectedLevelIndex);
+    }
+  } else if (GAME_STATE === "GAME_OVER") {
+    if (keyCode === ENTER || keyCode === RETURN) {
+      resetRunProgress();
+      GAME_STATE = "MAP";
     }
   } else if (keyCode === ESCAPE) {
     GAME_STATE = "MAP";
@@ -1485,6 +1501,11 @@ function draw() {
     return;
   }
 
+  if (GAME_STATE === "GAME_OVER") {
+    drawGameOverScreen();
+    return;
+  }
+
   if (invulnFrames > 0) invulnFrames--;
   if (freezeFrames > 0) freezeFrames--;
   if (invulnCooldown > 0) invulnCooldown--;
@@ -1507,12 +1528,7 @@ function draw() {
 
   if (GAME_STATE === "PLAY") {
     levelTimeFramesRemaining--;
-    if (level.isCoreBossLevel) {
-      if (levelTimeFramesRemaining <= 0) {
-        handleBossVictory();
-        return;
-      }
-    } else if (levelTimeFramesRemaining <= 0) {
+    if (levelTimeFramesRemaining <= 0) {
       handleLevelTimeout();
       return;
     }
@@ -1587,6 +1603,16 @@ function drawMapScreen() {
       text(lockLabel, x, labelBottom + 2);
     }
   }
+}
+
+function drawGameOverScreen() {
+  background(0, 0, 0);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(28);
+  text("GAME OVER", width / 2, height / 2 - 10);
+  textSize(16);
+  text("Press ENTER to restart", width / 2, height / 2 + 18);
 }
 
 function drawWrappedLabel(str, x, startY, maxWidth, lineHeight) {
@@ -1675,6 +1701,21 @@ function drawPortal(level) {
   ellipse(centerX, centerY, 32 + pulse, 32 + pulse);
   fill(255, 255, 255, 180);
   ellipse(centerX, centerY, 16 + pulse * 0.3, 16 + pulse * 0.3);
+
+  // On the core boss, also draw the outer exit portal
+  if (level.isCoreBossLevel) {
+    const exitTheta = maxTheta - Math.PI * 0.5;
+    const exitR = platformR(exitTheta);
+    const pos = worldToScreen(exitTheta, exitR);
+    const exitPulse = 10 * Math.sin(frameCount * 0.07) + 18;
+
+    noFill();
+    stroke(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 220);
+    strokeWeight(4);
+    ellipse(pos.x, pos.y, 30 + exitPulse, 30 + exitPulse);
+    strokeWeight(2);
+    ellipse(pos.x, pos.y, 16 + exitPulse * 0.6, 16 + exitPulse * 0.6);
+  }
 }
 
 function updateAndDrawPulse(level) {
@@ -1734,8 +1775,9 @@ function updateBossPull(level) {
 
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
   const progress = 1 - levelTimeFramesRemaining / total;
+  const eased = progress * progress; // starts gentle, speeds up as time runs out
   const maxPull = level.bossMaxPull || 200;
-  bossPullOffset = constrain(maxPull * progress, 0, maxPull);
+  bossPullOffset = constrain(maxPull * eased, 0, maxPull);
 }
 
 function drawEnemies() {
@@ -1837,6 +1879,7 @@ function drawHUD(level) {
   const ss = nf(secondsLeft % 60, 2);
   textAlign(RIGHT, TOP);
   text(`Time: ${mm}:${ss}`, width - 16, 12);
+  text(`Lives: ${lives}`, width - 16, 28);
 }
 
 // --- Level / game flow ---
@@ -1893,10 +1936,26 @@ function startLevel(idx) {
   GAME_STATE = "INTRO";
 }
 
-function handleLevelTimeout() {
+function loseLife() {
   globalShardTotal = Math.max(0, globalShardTotal - shardsEarnedThisRun);
   shardsEarnedThisRun = 0;
+  lives = Math.max(0, lives - 1);
+
+  if (lives <= 0) {
+    GAME_STATE = "GAME_OVER";
+    return;
+  }
+
+  bossPullOffset = 0;
   GAME_STATE = "MAP";
+  resetPlayerToStart();
+  generateEnemies();
+  generateShards();
+  levelTimeFramesRemaining = LEVEL_TIME_LIMIT_FRAMES;
+}
+
+function handleLevelTimeout() {
+  loseLife();
 }
 
 function handleBossVictory() {
@@ -1966,4 +2025,32 @@ function grantPlaytestUnlock() {
   checkChronoCoreUnlock();
   unlockedLevels[BOSS_LEVEL_INDEX] = true;
   selectedLevelIndex = Math.max(selectedLevelIndex, CHRONO_CORE_INDEX);
+}
+
+function resetRunProgress() {
+  // Reset overall progression, lives, and stage state back to the map.
+  globalShardTotal = 0;
+  lives = MAX_LIVES;
+  shardsEarnedThisRun = 0;
+  invulnFrames = 0;
+  freezeFrames = 0;
+  invulnCooldown = 0;
+  freezeCooldown = 0;
+  pulseActive = false;
+  pulseHeadTheta = 0;
+  pulseCooldown = 0;
+  bossPullOffset = 0;
+
+  // All eras are playable from the start except the Chaos Core and final boss
+  unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
+  selectedLevelIndex = 0;
+  currentLevel = 0;
+  currentLevelIndex = 0;
+
+  updateMaxThetaForCurrentLevel();
+  resetPlayerToStart();
+  generateEnemies();
+  generateShards();
+  bossDurationTotal = LEVEL_TIME_LIMIT_FRAMES;
+  levelTimeFramesRemaining = LEVEL_TIME_LIMIT_FRAMES;
 }
