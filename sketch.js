@@ -338,7 +338,7 @@ const levels = [
     enemyCount: 1,
     enemyOffsets: [0],
     shardCount: 0,
-    difficulty: { gravityScale: -1.2, runSpeedScale: 1.32, enemySpeedScale: 1.6 },
+    difficulty: { gravityScale: 1.2, runSpeedScale: 1.32, enemySpeedScale: 1.6 },
     isCoreBossLevel: true,
     bossDurationFrames: 60 * 60,
     bossMaxPull: 220,
