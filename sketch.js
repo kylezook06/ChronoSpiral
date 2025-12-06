@@ -11,6 +11,7 @@ let spiralA = 12; // tightness of the spiral (r = a * theta)
 const BASE_MAX_THETA = 10 * Math.PI; // standard stage length
 const BOSS_MAX_THETA = 60 * Math.PI; // effectively endless spiral for the core boss
 let maxTheta = BASE_MAX_THETA;
+let bossCameraScale = 1; // dynamic camera scale for the core boss fight
 
 let player;
 let currentLevel = 0;
@@ -389,18 +390,31 @@ function updateMaxThetaForCurrentLevel() {
   }
 }
 
+function updateBossCamera(level) {
+  if (!level?.isCoreBossLevel) {
+    bossCameraScale = 1;
+    return;
+  }
+
+  const targetScreenR = Math.min(width, height) * 0.35;
+  const playerWorldR = player ? player.getR() : spiralA * 2 * Math.PI;
+  const minWorldR = 80;
+  const clampedWorldR = Math.max(playerWorldR, minWorldR);
+  const desiredScale = targetScreenR / clampedWorldR;
+  const clampedScale = constrain(desiredScale, 0.2, 1);
+
+  bossCameraScale = lerp(bossCameraScale, clampedScale, 0.12);
+}
+
 // Map polar world coordinates to screen coordinates, allowing us to visually
-// "zoom" the Chaos Core boss stage without altering physics. For the boss, we
-// compress radii so the core stays dominant while gameplay still uses full
-// world-space distances.
+// "zoom" the Chaos Core boss stage without altering physics. For the boss, the
+// scale follows the player's distance so the core stays dominant while gameplay
+// still uses full world-space distances.
 function worldToScreen(theta, r) {
   const level = currentLevelObj();
 
-  let drawR = r;
-  if (level?.isCoreBossLevel) {
-    const CAMERA_FACTOR = 0.35; // tweak to adjust visual compression on the boss
-    drawR = r * CAMERA_FACTOR;
-  }
+  const scale = level?.isCoreBossLevel ? bossCameraScale : 1;
+  const drawR = r * scale;
 
   return {
     x: centerX + drawR * Math.cos(theta),
@@ -749,7 +763,7 @@ class Player {
 
     const maxLoops = isBoss ? 24 : 6; // how many rings to scan
     const minGap = isBoss ? 8 : 25; // ignore micro drops
-    const maxGap = isBoss ? 140 : 80; // allow big jumps on boss
+    const maxGap = isBoss ? 260 : 80; // allow big jumps on boss
 
     for (let k = 1; k <= maxLoops; k++) {
       const candidateTheta = baseAngle + TWO_PI * k;
@@ -1478,6 +1492,8 @@ function draw() {
 
   const level = currentLevelObj();
   background(level.palette.bg);
+
+  updateBossCamera(level);
 
   if (level.isCoreBossLevel) {
     updateBossPull(level);
