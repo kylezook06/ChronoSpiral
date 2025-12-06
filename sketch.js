@@ -313,8 +313,8 @@ const levels = [
     shardCount: 0,
     difficulty: { gravityScale: 1.35, runSpeedScale: 1.28, enemySpeedScale: 1.5 },
     isPulseLevel: true,
-    pulseIntervalFrames: 20 * 60,
-    pulseSpeed: 0.08,
+    pulseIntervalFrames: 2 * 60,
+    pulseSpeed: 0.13,
     safeZones: [
       { thetaStart: 2.0 * Math.PI, thetaEnd: 2.3 * Math.PI },
       { thetaStart: 4.0 * Math.PI, thetaEnd: 4.3 * Math.PI },
@@ -2189,6 +2189,9 @@ function draw() {
 
   drawPortal(level);
   drawSpiral(level);
+  if (level.isPulseLevel) {
+    drawPulseSafePads(level);
+  }
   updateAndDrawPulse(level);
   drawShards();
   drawEnemies();
@@ -2369,6 +2372,27 @@ function drawSpiral(level) {
     vertex(x, y);
   }
   endShape();
+}
+
+function drawPulseSafePads(level) {
+  if (!level.isPulseLevel || !level.safeZones) return;
+
+  const padColor = level.palette.portal;
+  const thetaStep = 0.25;
+
+  noStroke();
+  for (const zone of level.safeZones) {
+    for (let t = zone.thetaStart; t <= zone.thetaEnd; t += thetaStep) {
+      const r = level.platformCurve(t);
+      const pos = worldToScreen(t, r);
+
+      fill(padColor[0], padColor[1], padColor[2], 210);
+      ellipse(pos.x, pos.y, 34, 18);
+
+      fill(0, 70);
+      ellipse(pos.x, pos.y + 6, 26, 10);
+    }
+  }
 }
 
 function drawPortal(level) {
