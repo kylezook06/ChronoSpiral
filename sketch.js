@@ -1003,6 +1003,11 @@ class Enemy {
     this.facingDir = 1;
     this.rollAngle = random(TWO_PI);
     this.radius = 13;
+    this.pauseTimer = 0;
+    this.homeTheta = theta;
+    this.thetaRange = random(Math.PI * 0.6, Math.PI * 1.2);
+    this.isPhasedOut = false;
+    this.phaseTimer = Math.floor(random(40, 100));
   }
 
   update() {
@@ -1025,6 +1030,30 @@ class Enemy {
       speedMag *= 1.5;
     } else if (type === "jpMech") {
       speedMag *= 1.6;
+    } else if (type === "brahminSage") {
+      speedMag *= 0.7;
+    } else if (type === "monkeyThief") {
+      speedMag *= 1.05;
+    } else if (type === "mummyWalker") {
+      speedMag *= 0.7;
+    } else if (type === "ankhWisp") {
+      speedMag *= 1.6;
+    } else if (type === "itApprentice") {
+      speedMag *= 0.85;
+    } else if (type === "flyingContraption") {
+      speedMag *= 0.95;
+    } else if (type === "deckSailor") {
+      speedMag *= 1.05;
+    } else if (type === "cannonball") {
+      speedMag *= 2.0;
+    } else if (type === "freewayCar") {
+      speedMag *= 1.6;
+    } else if (type === "neonDrone") {
+      speedMag *= 0.95;
+    } else if (type === "jpDrone") {
+      speedMag *= 1.45;
+    } else if (type === "jpHoloGuard") {
+      speedMag *= 0.8;
     } else if (type === "bossChaos") {
       speedMag *= 1.8;
     } else if (type === "bossWarden") {
@@ -1035,6 +1064,19 @@ class Enemy {
 
     this.prevTheta = this.theta;
 
+    // Idle/chant pauses for select enemies
+    if (this.pauseTimer > 0) {
+      this.pauseTimer--;
+      speedMag = 0;
+    } else {
+      if (type === "brahminSage" && random() < 0.01) {
+        this.pauseTimer = Math.floor(random(30, 60));
+      }
+      if (type === "mummyWalker" && random() < 0.005) {
+        this.pauseTimer = Math.floor(random(12, 24));
+      }
+    }
+
     const thetaDelta = speedMag * this.dir;
     // Move along the curve
     this.theta = constrain(this.theta + thetaDelta, 0, maxTheta);
@@ -1044,6 +1086,10 @@ class Enemy {
     if (this.theta <= 0 || this.theta >= maxTheta) {
       this.dir *= -1;
       turned = true;
+    }
+
+    if (type === "mummyWalker" && turned) {
+      this.pauseTimer = Math.max(this.pauseTimer, Math.floor(random(10, 20)));
     }
 
     const deltaThetaSigned = this.theta - this.prevTheta;
@@ -1057,8 +1103,53 @@ class Enemy {
       this.movingDir = 0;
     }
 
+    // Home-band oscillation for localized walkers
+    if (type === "itApprentice") {
+      if (this.theta > this.homeTheta + this.thetaRange) {
+        this.dir = -1;
+        this.theta = this.homeTheta + this.thetaRange;
+      } else if (this.theta < this.homeTheta - this.thetaRange) {
+        this.dir = 1;
+        this.theta = this.homeTheta - this.thetaRange;
+      }
+    }
+
+    if (type === "deckSailor" && (turned || random() < 0.01)) {
+      this.offset = constrain(this.offset + random([-8, 8]), -18, 18);
+    }
+
+    if (type === "monkeyThief") {
+      const angleGap = Math.abs(((player.theta % TWO_PI) + TWO_PI - (this.theta % TWO_PI))) % TWO_PI;
+      const wrappedGap = Math.min(angleGap, TWO_PI - angleGap);
+      if (wrappedGap < 0.8) {
+        speedMag *= 1.6;
+      }
+    }
+
+    if (type === "freewayCar") {
+      speedMag *= 1 + Math.abs(this.offset) * 0.02;
+    }
+
+    if (type === "jpDrone" && random() < 0.01) {
+      this.dir *= -1;
+    }
+
+    if (type === "jpHoloGuard") {
+      this.phaseTimer--;
+      if (this.phaseTimer <= 0) {
+        this.isPhasedOut = !this.isPhasedOut;
+        this.phaseTimer = Math.floor(random(60, 120));
+      }
+    }
+
     const baseR = platformR(this.theta);
-    const laneR = baseR + constrain(this.offset, -6, 6);
+    let offsetLimit = 6;
+    if (["ankhWisp", "flyingContraption", "deckSailor", "cannonball", "freewayCar", "neonDrone", "jpDrone", "jpHoloGuard"].includes(type)) {
+      offsetLimit = 20;
+    } else if (["brahminSage", "monkeyThief", "itApprentice"].includes(type)) {
+      offsetLimit = 14;
+    }
+    const laneR = baseR + constrain(this.offset, -offsetLimit, offsetLimit);
     const groundOffset = type === "boulder" ? this.radius * 0.35 : 0;
     let radialWiggle = 0;
 
@@ -1070,6 +1161,10 @@ class Enemy {
     } else if (type === "lanternSpirit") {
       radialWiggle = 6 * Math.sin(frameCount * 0.17 + this.theta * 0.35);
       radialWiggle += 3 * Math.sin(frameCount * 0.11 + this.offset * 0.2);
+    } else if (type === "brahminSage") {
+      radialWiggle = 3 * Math.sin(frameCount * 0.12 + this.theta * 0.4);
+    } else if (type === "monkeyThief") {
+      radialWiggle = 8 * Math.sin(frameCount * 0.25 + this.theta * 0.7);
     } else if (type === "legionary") {
       if (turned) {
         radialWiggle += 4;
@@ -1079,10 +1174,28 @@ class Enemy {
       radialWiggle = 3 * Math.sin(frameCount * 0.18 + this.theta);
     } else if (type === "itInventor") {
       radialWiggle = 4 * Math.sin(frameCount * 0.22 + this.theta * 0.5);
+    } else if (type === "itApprentice") {
+      radialWiggle = 2 * Math.sin(frameCount * 0.2 + this.theta * 0.4);
+    } else if (type === "flyingContraption") {
+      radialWiggle = 8 * Math.sin(frameCount * 0.09 + this.theta * 0.4);
+    } else if (type === "deckSailor") {
+      radialWiggle = 3 * Math.sin(frameCount * 0.18 + this.theta * 0.6);
+    } else if (type === "cannonball") {
+      radialWiggle = 0;
     } else if (type === "usSkater") {
       radialWiggle = 3 * Math.sin(frameCount * 0.4 + this.theta);
+    } else if (type === "freewayCar") {
+      radialWiggle = 0;
+    } else if (type === "neonDrone") {
+      radialWiggle = 5 * Math.sin(frameCount * 0.22 + this.theta * 0.3);
     } else if (type === "jpMech") {
       radialWiggle = 4 * Math.sin(frameCount * 0.35 + this.theta * 1.2);
+    } else if (type === "jpDrone") {
+      const triPhase = (frameCount * 0.25 + this.theta) % TWO_PI;
+      const tri = triPhase < Math.PI ? triPhase / Math.PI : 2 - triPhase / Math.PI;
+      radialWiggle = 8 * (tri - 0.5);
+    } else if (type === "jpHoloGuard") {
+      radialWiggle = 4 * Math.sin(frameCount * 0.13 + this.theta * 0.6);
     } else if (type === "bossChaos") {
       radialWiggle = 10 * Math.sin(frameCount * 0.2 + this.theta * 1.2);
       radialWiggle += 6 * Math.sin(frameCount * 0.07 + this.offset);
@@ -1092,6 +1205,10 @@ class Enemy {
     } else if (type === "bossMini") {
       radialWiggle = 6 * Math.sin(frameCount * 0.2 + this.theta * 1.5);
       radialWiggle += 4 * Math.sin(frameCount * 0.12 + this.offset * 0.8);
+    } else if (type === "mummyWalker") {
+      radialWiggle = 2 * Math.sign(Math.sin(frameCount * 0.5 + this.theta));
+    } else if (type === "ankhWisp") {
+      radialWiggle = 3 * Math.sin(frameCount * 0.4 + this.theta * 0.9);
     } else if (type === "ikon") {
       radialWiggle = 4 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
     }
@@ -1135,7 +1252,7 @@ class Enemy {
     // Orient so local +Y points outward from the center (feet away from center)
     rotate(radialAngle - HALF_PI);
 
-    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos"].includes(type);
+    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos", "ankhWisp", "cannonball", "neonDrone"].includes(type);
     if (needsFacing && this.facingDir < 0) {
       scale(-1, 1);
     }
@@ -1241,12 +1358,88 @@ class Enemy {
         rectMode(CENTER);
         rect(0, -4, 18, 4, 2);
         break;
+      case "brahminSage":
+        translate(0, -12);
+        // Robe
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 6, 16, 18, 4);
+        // Head and beard
+        fill(240, 210, 180);
+        ellipse(0, -4, 14, 14);
+        fill(120, 80, 50);
+        arc(0, -2, 12, 10, 0, Math.PI, CHORD);
+        // Staff
+        stroke(120, 80, 50);
+        strokeWeight(3);
+        line(-8, -2, -8, 12);
+        noStroke();
+        // Halo
+        noFill();
+        stroke(255, 230, 160);
+        strokeWeight(2);
+        ellipse(0, -10, 16, 8);
+        break;
+      case "monkeyThief":
+        translate(0, -10);
+        // Body
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 2, 12, 12, 3);
+        // Head
+        fill(200, 160, 120);
+        ellipse(0, -6, 12, 10);
+        fill(0);
+        ellipse(-3, -7, 2, 2);
+        ellipse(3, -7, 2, 2);
+        // Tail
+        noFill();
+        stroke(60, 40, 30);
+        strokeWeight(3);
+        bezier(6, 6, 12, 6, 12, -6, 6, -6);
+        break;
       case "scarab":
         // Beetle-ish silhouette
         ellipse(0, -2, 18, 14); // body
         rect(0, -9, 10, 6, 2); // head
         line(-10, 4, -4, 0);
         line(10, 4, 4, 0);
+        break;
+      case "mummyWalker":
+        translate(0, -12);
+        // Legs
+        stroke(0);
+        strokeWeight(3);
+        strokeCap(ROUND);
+        line(-3, 10, -3, 16);
+        line(3, 10, 3, 16);
+        // Wrapped body
+        noStroke();
+        fill(240, 225, 200);
+        rectMode(CENTER);
+        rect(0, 4, 16, 18, 4);
+        stroke(200, 180, 150);
+        strokeWeight(2);
+        line(-8, 0, 8, -2);
+        line(-8, 6, 8, 4);
+        // Head
+        noStroke();
+        fill(240, 225, 200);
+        ellipse(0, -8, 14, 12);
+        fill(0);
+        ellipse(2, -8, 3, 3);
+        break;
+      case "ankhWisp":
+        // Floating ankh glyph
+        noFill();
+        stroke(tint[0], tint[1], tint[2]);
+        strokeWeight(3);
+        ellipse(0, -6, 10, 10);
+        line(0, -1, 0, 10);
+        line(-6, 5, 6, 5);
+        noStroke();
+        fill(tint[0], tint[1], tint[2], 160);
+        ellipse(0, 12, 10, 6);
         break;
       case "legionary":
         // Shield-forward legionary silhouette
@@ -1290,6 +1483,35 @@ class Enemy {
         line(8, -2, 8, 6);
         line(4, 2, 12, 2);
         break;
+      case "itApprentice":
+        translate(0, -10);
+        rectMode(CENTER);
+        // Body
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 4, 12, 14, 3);
+        // Head
+        fill(230, 210, 180);
+        ellipse(0, -4, 12, 10);
+        // Scroll
+        fill(240, 220, 190);
+        rect(6, 6, 8, 4, 2);
+        break;
+      case "flyingContraption": {
+        // Simple glider/ornithopter silhouette
+        const wingFlap = Math.sin(frameCount * 0.15) * 8;
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 0, 18, 6, 2); // body
+        push();
+        rotate(radians(wingFlap));
+        rect(-2, 0, 24, 4, 2);
+        pop();
+        push();
+        rotate(radians(-wingFlap));
+        rect(2, 0, 24, 4, 2);
+        pop();
+        break;
+      }
       case "britMusketeer":
         // Musketeer silhouette with tall hat and sash
         rectMode(CENTER);
@@ -1303,6 +1525,35 @@ class Enemy {
         stroke(0);
         strokeWeight(2);
         line(-8, 0, 8, 8); // sash
+        break;
+      case "deckSailor":
+        translate(0, -12);
+        // Body
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 4, 14, 18, 4);
+        // Head
+        fill(230, 210, 180);
+        ellipse(0, -6, 12, 10);
+        // Rope across shoulder
+        stroke(120, 90, 60);
+        strokeWeight(3);
+        line(-8, -2, 8, 10);
+        break;
+      case "cannonball":
+        // Rolling cannon shot
+        push();
+        rotate(this.rollAngle);
+        noStroke();
+        fill(60, 60, 70);
+        ellipse(0, 0, this.radius * 1.8, this.radius * 1.8);
+        stroke(20);
+        strokeWeight(3);
+        line(-this.radius * 0.6, 0, this.radius * 0.6, 0);
+        noStroke();
+        fill(255, 180, 80);
+        ellipse(0, 0, 4, 4); // fuse stub
+        pop();
         break;
       case "usSkater":
         // Skater with board
@@ -1319,6 +1570,27 @@ class Enemy {
         fill(0);
         arc(0, -11, 14, 8, Math.PI, 0); // cap
         break;
+      case "freewayCar":
+        translate(0, -8);
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 6, 26, 10, 3);
+        rect(0, 0, 18, 8, 2);
+        fill(255, 240, 200);
+        ellipse(-8, 8, 3, 3);
+        ellipse(8, 8, 3, 3);
+        break;
+      case "neonDrone": {
+        // Hovering neon drone
+        const bob = Math.sin(frameCount * 0.2) * 2;
+        translate(0, bob - 4);
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 0, 14, 14, 3);
+        fill(120, 240, 255);
+        rect(0, 6, 12, 4, 2);
+        break;
+      }
       case "jpMech":
         // Compact mech/robot head
         rectMode(CENTER);
@@ -1333,6 +1605,29 @@ class Enemy {
         rect(-10, -2, 3, 6, 1);
         rect(10, -2, 3, 6, 1);
         break;
+      case "jpDrone":
+        // Compact zig-zag drone
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 0, 14, 12, 3);
+        fill(0);
+        rect(-3, -2, 3, 3);
+        rect(3, -2, 3, 3);
+        fill(120, 255, 220);
+        rect(0, 4, 10, 4, 2);
+        break;
+      case "jpHoloGuard": {
+        // Tall holographic guardian
+        const alpha = this.isPhasedOut ? 90 : 200;
+        rectMode(CENTER);
+        fill(tint[0], tint[1], tint[2], alpha);
+        rect(0, 0, 16, 26, 5);
+        noFill();
+        stroke(120, 255, 220, alpha);
+        strokeWeight(2);
+        rect(0, 0, 18, 28, 6);
+        break;
+      }
       case "bossChaos": {
         // Fractured time core shard
         rectMode(CENTER);
@@ -2021,6 +2316,7 @@ function generateEnemies() {
   const level = currentLevelObj();
   const count = level.enemyCount || 6;
   const offsets = level.enemyOffsets || [-30, -10, 10, 30];
+  const stageIndex = currentLevel;
 
   // Core boss: spawn the main Warden plus a fleet of smaller sentinels
   if (level.isCoreBossLevel) {
@@ -2035,14 +2331,140 @@ function generateEnemies() {
     return;
   }
 
-  // Stage 1 mixes Neanderthals with boulders; other stages use their default type
-  if (currentLevel === 0) {
+  // Stage 1 mixes Neanderthals with boulders
+  if (stageIndex === 0) {
     const neanderCount = Math.min(2, count);
 
     for (let i = 0; i < count; i++) {
       const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
       const offset = random(offsets);
       const subtype = i < neanderCount ? "neanderthal" : "boulder";
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 2 — Ancient India: lotus orbs + sages + monkeys
+  if (stageIndex === 1) {
+    const sageCount = Math.max(1, Math.floor(count * 0.25));
+    const monkeyCount = Math.max(1, Math.floor(count * 0.25));
+    const lotusCount = Math.max(0, count - sageCount - monkeyCount);
+    const typeSlots = [
+      ...Array(lotusCount).fill("lotusOrb"),
+      ...Array(sageCount).fill("brahminSage"),
+      ...Array(monkeyCount).fill("monkeyThief"),
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "brahminSage") offset = random([-14, -8, 0, 8, 14]);
+      if (subtype === "monkeyThief") offset = random([-16, -10, 10, 16]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 3 — Ancient Egypt: scarabs + mummies + ankhs
+  if (stageIndex === 2) {
+    const mummyCount = Math.max(1, Math.floor(count * 0.3));
+    const wispCount = Math.max(1, Math.floor(count * 0.2));
+    const scarabCount = Math.max(0, count - mummyCount - wispCount);
+    const typeSlots = [
+      ...Array(scarabCount).fill("scarab"),
+      ...Array(mummyCount).fill("mummyWalker"),
+      ...Array(wispCount).fill("ankhWisp"),
+    ];
+
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      let offset = random(offsets);
+      const subtype = typeSlots[i % typeSlots.length];
+      if (subtype === "ankhWisp") offset = random([10, 14, 18]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 9 — Renaissance Italy: inventors + apprentices + flying contraptions
+  if (stageIndex === 8) {
+    const apprenticeCount = Math.max(1, Math.floor(count * 0.3));
+    const flierCount = Math.max(1, Math.floor(count * 0.25));
+    const inventorCount = Math.max(0, count - apprenticeCount - flierCount);
+    const typeSlots = [
+      ...Array(inventorCount).fill("itInventor"),
+      ...Array(apprenticeCount).fill("itApprentice"),
+      ...Array(flierCount).fill("flyingContraption"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "flyingContraption") offset = random([-18, -10, 10, 18]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 10 — Britain: musketeers + sailors + cannonballs
+  if (stageIndex === 9) {
+    const sailorCount = Math.max(1, Math.floor(count * 0.3));
+    const cannonCount = Math.max(1, Math.floor(count * 0.2));
+    const musketeerCount = Math.max(0, count - sailorCount - cannonCount);
+    const typeSlots = [
+      ...Array(musketeerCount).fill("britMusketeer"),
+      ...Array(sailorCount).fill("deckSailor"),
+      ...Array(cannonCount).fill("cannonball"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "cannonball") offset = random([16, 18, 20]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 11 — Modern America: skaters + cars + neon drones
+  if (stageIndex === 10) {
+    const carCount = Math.max(1, Math.floor(count * 0.3));
+    const droneCount = Math.max(1, Math.floor(count * 0.2));
+    const skaterCount = Math.max(0, count - carCount - droneCount);
+    const typeSlots = [
+      ...Array(skaterCount).fill("usSkater"),
+      ...Array(carCount).fill("freewayCar"),
+      ...Array(droneCount).fill("neonDrone"),
+    ];
+    const carOffsets = [-24, -14, 14, 24, 30];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "freewayCar") offset = random(carOffsets);
+      if (subtype === "neonDrone") offset = random([-14, -8, 8, 14]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 12 — Future Japan: mechs + drones + hologuards
+  if (stageIndex === 11) {
+    const droneCount = Math.max(1, Math.floor(count * 0.3));
+    const holoCount = Math.max(1, Math.floor(count * 0.2));
+    const mechCount = Math.max(0, count - droneCount - holoCount);
+    const typeSlots = [
+      ...Array(mechCount).fill("jpMech"),
+      ...Array(droneCount).fill("jpDrone"),
+      ...Array(holoCount).fill("jpHoloGuard"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "jpDrone") offset = random([-18, -12, 12, 18]);
+      if (subtype === "jpHoloGuard") offset = random([-10, 0, 10]);
       enemies.push(new Enemy(theta, offset, subtype));
     }
     return;
