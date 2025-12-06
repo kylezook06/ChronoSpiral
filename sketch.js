@@ -132,28 +132,7 @@ const levels = [
     },
   },
   {
-    name: "Stage 6 — Medieval China",
-    year: "1100 CE",
-    location: "Great Wall Peaks",
-    palette: { bg: [8, 20, 26], spiral: [60, 200, 160], portal: [255, 200, 140] },
-    musicHint: "Lantern lullabies, bamboo flutes",
-    enemyTint: [180, 200, 255],
-    enemyType: "lanternSpirit",
-    enemyCount: 9,
-    enemyOffsets: [-30, -10, 10, 30],
-    shardCount: 11,
-    difficulty: { gravityScale: 1.12, runSpeedScale: 1.1, enemySpeedScale: 1.15 },
-    // Great Wall-like crenellations along the spiral
-    platformCurve: (theta) => {
-      const base = spiralA * theta;
-      const segmentSize = 35;
-      const wallBase = Math.floor(base / segmentSize) * segmentSize;
-      const crenel = 8 * Math.sign(Math.sin(theta * 6));
-      return wallBase + crenel;
-    },
-  },
-  {
-    name: "Stage 7 — Byzantine Empire",
+    name: "Stage 6 — Byzantine Empire",
     year: "540 CE",
     location: "Constantinople",
     palette: { bg: [10, 8, 30], spiral: [240, 210, 120], portal: [255, 255, 210] },
@@ -171,6 +150,27 @@ const levels = [
       const domes = 6;
       const domeShape = Math.pow(Math.cos((domes * theta) / 2), 2);
       return base + domeAmp * domeShape;
+    },
+  },
+  {
+    name: "Stage 7 — Medieval China",
+    year: "1100 CE",
+    location: "Great Wall Peaks",
+    palette: { bg: [8, 20, 26], spiral: [60, 200, 160], portal: [255, 200, 140] },
+    musicHint: "Lantern lullabies, bamboo flutes",
+    enemyTint: [180, 200, 255],
+    enemyType: "lanternSpirit",
+    enemyCount: 9,
+    enemyOffsets: [-30, -10, 10, 30],
+    shardCount: 11,
+    difficulty: { gravityScale: 1.12, runSpeedScale: 1.1, enemySpeedScale: 1.15 },
+    // Great Wall-like crenellations along the spiral
+    platformCurve: (theta) => {
+      const base = spiralA * theta;
+      const segmentSize = 35;
+      const wallBase = Math.floor(base / segmentSize) * segmentSize;
+      const crenel = 8 * Math.sign(Math.sin(theta * 6));
+      return wallBase + crenel;
     },
   },
   {

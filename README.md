@@ -13,7 +13,7 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 ## Notes
 
 - Each era defines its own platform curve (spiral → lotus waves → stepped tiers → star spikes) so the player, enemies, and collectibles hug era-specific geometry.
-- Levels cycle through era themes (Neanderthal → Ancient India → Ancient Egypt → Ancient Greece → Ancient Rome → Medieval China → Byzantine Empire → Medieval France → Renaissance Italy → 17th Century Britain → Modern America → Future Japan → Chrono Core → Chrono Boss) with color palettes, enemy silhouettes, and shard counts to hint at future art/sound direction. The final two arenas intentionally spawn no shards.
+- Levels cycle through era themes (Neanderthal → Ancient India → Ancient Egypt → Ancient Greece → Ancient Rome → Byzantine Empire → Medieval China → Medieval France → Renaissance Italy → 17th Century Britain → Modern America → Future Japan → Chrono Core → Chrono Boss) with color palettes, enemy silhouettes, and shard counts to hint at future art/sound direction. The final two arenas intentionally spawn no shards.
 - Chrono Core (Stage 13) stays locked until you gather 60 shards; clearing it unlocks the Chrono Boss (Stage 14), an escape sprint where the spiral is being sucked toward the core. Thick safe platforms help you dodge recurring electric pulses, and running into the core costs a life while reaching the distant exit portal wins the fight.
 - The player is simulated in polar coordinates (r, θ) so gravity pushes outward and the curve acts as the main platform; reaching the center warps you forward on normal stages, drifting too far outward resets you to the start (except in the core boss escape), and falling into enemies does the same. On the Chrono Boss, the core is lethal and the win condition is reaching the outer exit portal before you run out of lives or time.
 - Hazards and collectibles move or sit along the curve with slight radial offsets; touching an enemy resets your position while grabbing Time Shards increases the level shard count.
@@ -25,7 +25,7 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 ## ChronoSpiral 1.0 roadmap (current pass)
 
 1. **Content expansion**
-   - Add new stages with bespoke curves/enemies: Ancient Rome (tiered colosseum arches), Medieval China (crenellated wall), Byzantine Empire (dome bulges), Medieval France (gothic arches), Renaissance Italy (layered Da Vinci waves), 17th Century Britain (rolling sea wobble), Modern America (freeway ramps), Future Japan (neon spikes), Chrono Core pulse run, and a pulling/gravity-flip Chrono Boss arena.
+  - Add new stages with bespoke curves/enemies: Ancient Rome (tiered colosseum arches), Byzantine Empire (dome bulges), Medieval China (crenellated wall), Medieval France (gothic arches), Renaissance Italy (layered Da Vinci waves), 17th Century Britain (rolling sea wobble), Modern America (freeway ramps), Future Japan (neon spikes), Chrono Core pulse run, and a pulling/gravity-flip Chrono Boss arena.
 2. **Light systems pass**
    - Per-level difficulty scalars (gravity/run/enemy speed) to ramp intensity without rewriting core movement.
    - Optional shard gating for warps (collect all shards to advance).
