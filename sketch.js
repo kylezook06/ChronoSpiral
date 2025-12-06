@@ -1008,13 +1008,17 @@ class Enemy {
     this.thetaRange = random(Math.PI * 0.6, Math.PI * 1.2);
     this.isPhasedOut = false;
     this.phaseTimer = Math.floor(random(40, 100));
+    this.isBuffed = false;
+    this.hitboxBoost = 0;
   }
 
-  update() {
+  update(bearerThetas = []) {
     const level = currentLevelObj();
     const type = this.subtype || level.enemyType;
     const enemySpeedScale = level.difficulty?.enemySpeedScale ?? 1;
     let speedMag = this.baseSpeed * enemySpeedScale;
+    this.isBuffed = false;
+    this.hitboxBoost = 0;
 
     if (type === "hoplite") {
       speedMag *= 1.4;
@@ -1060,9 +1064,43 @@ class Enemy {
       speedMag *= 1.7;
     } else if (type === "bossMini") {
       speedMag *= 1.9;
+    } else if (type === "harpy") {
+      speedMag *= 1.15;
+    } else if (type === "rollingAmphora") {
+      speedMag *= 0.6;
+    } else if (type === "standardBearer") {
+      speedMag *= 0.95;
+    } else if (type === "rollingShield") {
+      speedMag *= 0.85;
+    } else if (type === "paperCrane") {
+      speedMag *= 1.0;
+    } else if (type === "palaceGuard") {
+      speedMag *= 0.8;
+    } else if (type === "censerSmoke") {
+      speedMag *= 0.9;
+    } else if (type === "mosaicShard") {
+      speedMag *= 1.1;
+    } else if (type === "warHorse") {
+      speedMag *= 1.35;
+    } else if (type === "bannerWaver") {
+      speedMag *= 0.85;
     }
 
     this.prevTheta = this.theta;
+
+    // Buff from nearby standard bearers
+    if (type !== "standardBearer" && bearerThetas.length > 0) {
+      const nearBanner = bearerThetas.some((t) => {
+        const angleGap = Math.abs(((this.theta % TWO_PI) + TWO_PI - (t % TWO_PI))) % TWO_PI;
+        const wrappedGap = Math.min(angleGap, TWO_PI - angleGap);
+        return wrappedGap < 0.6;
+      });
+      if (nearBanner) {
+        speedMag *= 1.12;
+        this.isBuffed = true;
+        this.hitboxBoost = 2;
+      }
+    }
 
     // Idle/chant pauses for select enemies
     if (this.pauseTimer > 0) {
@@ -1090,6 +1128,19 @@ class Enemy {
 
     if (type === "mummyWalker" && turned) {
       this.pauseTimer = Math.max(this.pauseTimer, Math.floor(random(10, 20)));
+    }
+
+    if (type === "rollingShield") {
+      const range = Math.PI * 0.6;
+      const minTheta = this.homeTheta - range * 0.5;
+      const maxThetaLocal = this.homeTheta + range * 0.5;
+      if (this.theta > maxThetaLocal) {
+        this.theta = maxThetaLocal;
+        this.dir = -1;
+      } else if (this.theta < minTheta) {
+        this.theta = minTheta;
+        this.dir = 1;
+      }
     }
 
     const deltaThetaSigned = this.theta - this.prevTheta;
@@ -1130,6 +1181,40 @@ class Enemy {
       speedMag *= 1 + Math.abs(this.offset) * 0.02;
     }
 
+    if (type === "harpy") {
+      const angleGap = Math.abs(((player.theta % TWO_PI) + TWO_PI - (this.theta % TWO_PI))) % TWO_PI;
+      const wrappedGap = Math.min(angleGap, TWO_PI - angleGap);
+      if (wrappedGap < 0.7) {
+        speedMag *= 1.35;
+      }
+    }
+
+    if (type === "paperCrane" && (turned || random() < 0.015)) {
+      this.offset = constrain(this.offset + random([-6, 6]), -18, 18);
+    }
+
+    if (type === "palaceGuard") {
+      const patrolRange = Math.PI * 0.35;
+      if (this.theta > this.homeTheta + patrolRange * 0.5) {
+        this.theta = this.homeTheta + patrolRange * 0.5;
+        this.dir = -1;
+        this.pauseTimer = Math.max(this.pauseTimer, 10);
+      } else if (this.theta < this.homeTheta - patrolRange * 0.5) {
+        this.theta = this.homeTheta - patrolRange * 0.5;
+        this.dir = 1;
+        this.pauseTimer = Math.max(this.pauseTimer, 10);
+      }
+    }
+
+    if (type === "warHorse") {
+      const angleGap = Math.abs(((player.theta % TWO_PI) + TWO_PI - (this.theta % TWO_PI))) % TWO_PI;
+      const wrappedGap = Math.min(angleGap, TWO_PI - angleGap);
+      const radialGap = Math.abs(player.getR() - platformR(this.theta));
+      if (wrappedGap < 0.6 && radialGap < 30) {
+        speedMag *= 1.7;
+      }
+    }
+
     if (type === "jpDrone" && random() < 0.01) {
       this.dir *= -1;
     }
@@ -1144,13 +1229,29 @@ class Enemy {
 
     const baseR = platformR(this.theta);
     let offsetLimit = 6;
-    if (["ankhWisp", "flyingContraption", "deckSailor", "cannonball", "freewayCar", "neonDrone", "jpDrone", "jpHoloGuard"].includes(type)) {
+    if (
+      [
+        "ankhWisp",
+        "flyingContraption",
+        "deckSailor",
+        "cannonball",
+        "freewayCar",
+        "neonDrone",
+        "jpDrone",
+        "jpHoloGuard",
+        "paperCrane",
+        "harpy",
+      ].includes(type)
+    ) {
       offsetLimit = 20;
-    } else if (["brahminSage", "monkeyThief", "itApprentice"].includes(type)) {
+    } else if (
+      ["brahminSage", "monkeyThief", "itApprentice", "palaceGuard", "standardBearer", "rollingShield"].includes(type)
+    ) {
       offsetLimit = 14;
     }
     const laneR = baseR + constrain(this.offset, -offsetLimit, offsetLimit);
-    const groundOffset = type === "boulder" ? this.radius * 0.35 : 0;
+    const rollingTypes = ["boulder", "rollingAmphora", "rollingShield", "cannonball"];
+    const groundOffset = rollingTypes.includes(type) ? this.radius * 0.35 : 0;
     let radialWiggle = 0;
 
     // Slight behavior variations per enemy type, kept subtle so feet stay on the ground
@@ -1211,12 +1312,37 @@ class Enemy {
       radialWiggle = 3 * Math.sin(frameCount * 0.4 + this.theta * 0.9);
     } else if (type === "ikon") {
       radialWiggle = 4 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
+    } else if (type === "harpy") {
+      radialWiggle = 10 * Math.sin(frameCount * 0.18 + this.theta * 0.7);
+    } else if (type === "rollingAmphora") {
+      radialWiggle = 0;
+    } else if (type === "standardBearer") {
+      radialWiggle = 2 * Math.sin(frameCount * 0.14 + this.theta * 0.4);
+    } else if (type === "rollingShield") {
+      radialWiggle = 1 * Math.sin(frameCount * 0.22 + this.theta * 0.6);
+    } else if (type === "paperCrane") {
+      radialWiggle = 6 * Math.sin(frameCount * 0.2 + this.theta * 0.5);
+    } else if (type === "palaceGuard") {
+      radialWiggle = 2 * Math.sin(frameCount * 0.16 + this.theta * 0.4);
+    } else if (type === "censerSmoke") {
+      radialWiggle = 6 * Math.sin(frameCount * 0.18 + this.theta * 0.6);
+    } else if (type === "mosaicShard") {
+      radialWiggle = 9 * Math.sin(frameCount * 0.26 + this.theta * 0.9);
+    } else if (type === "warHorse") {
+      radialWiggle = 3 * Math.sin(frameCount * 0.2 + this.theta * 0.5);
+    } else if (type === "bannerWaver") {
+      radialWiggle = 4 * Math.sin(frameCount * 0.18 + this.theta * 0.45);
+      this.hitboxBoost = Math.max(this.hitboxBoost, 4);
     }
 
     // Keep enemies attached to the platform lane with a small wiggle allowance
     const clampBand = 10;
     const radiusBase = laneR + groundOffset;
     const radius = constrain(radiusBase + radialWiggle, radiusBase - clampBand, radiusBase + clampBand);
+
+    if (type === "mosaicShard" && random() < 0.05) {
+      this.theta = constrain(this.theta + random([-0.05, 0.05]), 0, maxTheta);
+    }
 
     // Track roll based on distance traveled along the curve
     const pathDistance = Math.abs(deltaThetaSigned) * baseR;
@@ -1252,7 +1378,20 @@ class Enemy {
     // Orient so local +Y points outward from the center (feet away from center)
     rotate(radialAngle - HALF_PI);
 
-    const needsFacing = !["boulder", "lotusOrb", "lanternSpirit", "ikon", "bossChaos", "ankhWisp", "cannonball", "neonDrone"].includes(type);
+    const needsFacing = ![
+      "boulder",
+      "lotusOrb",
+      "lanternSpirit",
+      "ikon",
+      "bossChaos",
+      "ankhWisp",
+      "cannonball",
+      "neonDrone",
+      "rollingAmphora",
+      "rollingShield",
+      "censerSmoke",
+      "mosaicShard",
+    ].includes(type);
     if (needsFacing && this.facingDir < 0) {
       scale(-1, 1);
     }
@@ -1295,6 +1434,22 @@ class Enemy {
         line(2, -4, 7, -6);
         noFill();
         arc(0, 2, 8, 6, 0.2 * Math.PI, 0.8 * Math.PI);
+        pop();
+        break;
+      case "rollingAmphora":
+        // Tall vase rolling along its side
+        push();
+        rotate(this.rollAngle);
+        noStroke();
+        fill(190, 140, 90);
+        ellipse(0, 0, this.radius * 1.2, this.radius * 2.2);
+        fill(120, 80, 50);
+        ellipse(0, -this.radius * 0.5, this.radius * 0.5, this.radius * 0.5);
+        ellipse(0, this.radius * 0.5, this.radius * 0.8, this.radius * 0.5);
+        stroke(80, 50, 30);
+        strokeWeight(3);
+        noFill();
+        ellipse(0, 0, this.radius * 1.2, this.radius * 2.2);
         pop();
         break;
       case "neanderthal":
@@ -1357,6 +1512,32 @@ class Enemy {
         fill(255, 240, 210);
         rectMode(CENTER);
         rect(0, -4, 18, 4, 2);
+        break;
+      case "paperCrane":
+        // Origami bird glider
+        translate(0, -6);
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        triangle(-10, 4, 0, -6, 10, 4);
+        triangle(-6, 6, 0, 0, -2, 8);
+        triangle(6, 6, 0, 0, 2, 8);
+        break;
+      case "palaceGuard":
+        // Stationed guard pacing a short arc
+        translate(0, -10);
+        stroke(0);
+        strokeWeight(3);
+        line(-2, 10, -2, 16);
+        line(2, 10, 2, 16);
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        rectMode(CENTER);
+        rect(0, 4, 14, 16, 3);
+        fill(230, 210, 180);
+        ellipse(0, -6, 12, 10);
+        stroke(0);
+        strokeWeight(2);
+        line(6, -2, 12, 6); // spear
         break;
       case "brahminSage":
         translate(0, -12);
@@ -1452,6 +1633,32 @@ class Enemy {
         fill(255, 0, 0);
         rect(0, -20, 6, 6, 2); // plume
         break;
+      case "standardBearer":
+        // Legionary carrying a standard
+        translate(0, -4);
+        stroke(0);
+        strokeWeight(2);
+        line(-8, -18, -8, 10); // pole
+        fill(255, 220, 120);
+        rect(-4, -12, 12, 10, 2); // banner
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 6, 16, 18, 4); // body
+        fill(0);
+        rect(0, -6, 12, 6, 2); // helm
+        break;
+      case "rollingShield":
+        // Round scutum rolling between bounds
+        push();
+        rotate(this.rollAngle);
+        fill(tint[0], tint[1], tint[2]);
+        ellipse(0, 0, this.radius * 2, this.radius * 2);
+        stroke(0);
+        strokeWeight(2);
+        line(-this.radius * 0.7, 0, this.radius * 0.7, 0);
+        line(0, -this.radius * 0.7, 0, this.radius * 0.7);
+        pop();
+        break;
       case "frKnight":
         // Medieval knight with cross shield and plume
         rectMode(CENTER);
@@ -1466,6 +1673,33 @@ class Enemy {
         rect(0, -10, 14, 8, 2); // helmet
         fill(255, 0, 0);
         rect(0, -15, 6, 5, 1); // plume
+        break;
+      case "warHorse":
+        // Charging horse + rider silhouette
+        translate(0, -8);
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        ellipse(-6, 10, 16, 10); // hind legs mass
+        ellipse(6, 10, 16, 10);
+        rect(0, 2, 20, 10, 3); // body
+        triangle(-10, 0, -14, -8, -6, -2); // tail
+        rect(4, -10, 12, 12, 3); // head
+        fill(0);
+        ellipse(6, -12, 3, 3);
+        break;
+      case "bannerWaver":
+        // Slow walker with outward flag
+        translate(0, -10);
+        stroke(0);
+        strokeWeight(2);
+        line(-6, -6, -16, -2); // flag pole
+        noStroke();
+        fill(255, 220, 160);
+        quad(-16, -8, -4, -6, -8, 2, -18, 0);
+        fill(tint[0], tint[1], tint[2]);
+        rect(0, 4, 14, 16, 3);
+        fill(230, 210, 180);
+        ellipse(0, -6, 12, 10);
         break;
       case "itInventor":
         // Da Vinci tinkerer with gear gadget
@@ -1670,6 +1904,20 @@ class Enemy {
         noFill();
         arc(0, 4, 10, 6, 0, Math.PI);
         break;
+      case "harpy":
+        // Winged swooper
+        translate(0, -8);
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        triangle(-12, 0, 0, -10, 12, 0); // wings
+        ellipse(0, 4, 10, 12); // body
+        fill(0);
+        ellipse(3, 2, 3, 3);
+        stroke(0);
+        strokeWeight(2);
+        line(0, 10, -4, 14);
+        line(0, 10, 4, 14);
+        break;
       case "hoplite":
         // Ghostly hoplite helm shape
         rectMode(CENTER);
@@ -1687,6 +1935,35 @@ class Enemy {
         line(-6, 0, 6, 0);
         line(0, -6, 0, 6);
         break;
+      case "censerSmoke":
+        // Hanging censer with trailing smoke
+        translate(0, -6);
+        stroke(0);
+        strokeWeight(2);
+        line(0, -12, 0, -18);
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        ellipse(0, 0, 12, 10);
+        fill(255, 240, 210, 150);
+        ellipse(-4, 10, 10, 6);
+        ellipse(2, 14, 8, 5);
+        break;
+      case "mosaicShard": {
+        // Cluster of spinning tesserae
+        const spin = frameCount * 0.08;
+        push();
+        rotate(spin);
+        for (let i = 0; i < 3; i++) {
+          const ang = (TWO_PI / 3) * i;
+          push();
+          rotate(ang);
+          fill(tint[0], tint[1], tint[2]);
+          quad(-4, -2, 4, -2, 6, 2, -6, 2);
+          pop();
+        }
+        pop();
+        break;
+      }
       default:
         // Fallback generic baddie
         rectMode(CENTER);
@@ -2116,9 +2393,14 @@ function updateBossPull(level) {
 }
 
 function drawEnemies() {
+  const level = currentLevelObj();
+  const bearerThetas = enemies
+    .filter((en) => (en.subtype || level.enemyType) === "standardBearer")
+    .map((en) => en.theta);
+
   enemies.forEach((e) => {
     if (freezeFrames <= 0) {
-      e.update();
+      e.update(bearerThetas);
     }
     e.draw();
 
@@ -2126,7 +2408,8 @@ function drawEnemies() {
     if (GAME_STATE === "PLAY" && invulnFrames <= 0) {
       const d = dist(player.x, player.y, e.x, e.y);
       const sameLevel = Math.abs(player.r - e.r) <= 18; // require roughly same platform level
-      if (sameLevel && d < player.radius + 12) {
+      const hitRadius = player.radius + 12 + (e.hitboxBoost || 0);
+      if (sameLevel && d < hitRadius) {
         const type = e.subtype || currentLevelObj().enemyType;
         if (currentLevelObj().isCoreBossLevel && (type === "bossMini" || type === "bossWarden")) {
           // Drag the player back toward the core as punishment
@@ -2382,6 +2665,107 @@ function generateEnemies() {
       let offset = random(offsets);
       const subtype = typeSlots[i % typeSlots.length];
       if (subtype === "ankhWisp") offset = random([10, 14, 18]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 4 — Ancient Greece: hoplites + harpies + rolling amphorae
+  if (stageIndex === 3) {
+    const harpyCount = Math.max(1, Math.floor(count * 0.3));
+    const amphoraCount = Math.max(1, Math.floor(count * 0.2));
+    const hopliteCount = Math.max(0, count - harpyCount - amphoraCount);
+    const typeSlots = [
+      ...Array(hopliteCount).fill("hoplite"),
+      ...Array(harpyCount).fill("harpy"),
+      ...Array(amphoraCount).fill("rollingAmphora"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "rollingAmphora") offset = random([-10, -6, 6, 10]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 5 — Ancient Rome: legionaries + standard bearers + rolling shields
+  if (stageIndex === 4) {
+    const bearerCount = Math.max(1, Math.floor(count * 0.25));
+    const shieldCount = Math.max(1, Math.floor(count * 0.25));
+    const legionCount = Math.max(0, count - bearerCount - shieldCount);
+    const typeSlots = [
+      ...Array(legionCount).fill("legionary"),
+      ...Array(bearerCount).fill("standardBearer"),
+      ...Array(shieldCount).fill("rollingShield"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "rollingShield") offset = random([10, 14, 18]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 6 — Byzantine Empire: ikons + censer smoke + mosaic shards
+  if (stageIndex === 5) {
+    const censerCount = Math.max(1, Math.floor(count * 0.25));
+    const shardCount = Math.max(1, Math.floor(count * 0.25));
+    const ikonCount = Math.max(0, count - censerCount - shardCount);
+    const typeSlots = [
+      ...Array(ikonCount).fill("ikon"),
+      ...Array(censerCount).fill("censerSmoke"),
+      ...Array(shardCount).fill("mosaicShard"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "mosaicShard") offset = random([-12, -6, 6, 12]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 7 — Medieval China: lantern spirits + cranes + palace guards
+  if (stageIndex === 6) {
+    const craneCount = Math.max(1, Math.floor(count * 0.3));
+    const guardCount = Math.max(1, Math.floor(count * 0.25));
+    const lanternCount = Math.max(0, count - craneCount - guardCount);
+    const typeSlots = [
+      ...Array(lanternCount).fill("lanternSpirit"),
+      ...Array(craneCount).fill("paperCrane"),
+      ...Array(guardCount).fill("palaceGuard"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "paperCrane") offset = random([-18, -12, 12, 18]);
+      enemies.push(new Enemy(theta, offset, subtype));
+    }
+    return;
+  }
+
+  // Stage 8 — Medieval France: knights + war horses + banner wavers
+  if (stageIndex === 7) {
+    const horseCount = Math.max(1, Math.floor(count * 0.3));
+    const bannerCount = Math.max(1, Math.floor(count * 0.25));
+    const knightCount = Math.max(0, count - horseCount - bannerCount);
+    const typeSlots = [
+      ...Array(knightCount).fill("frKnight"),
+      ...Array(horseCount).fill("warHorse"),
+      ...Array(bannerCount).fill("bannerWaver"),
+    ];
+    for (let i = 0; i < count; i++) {
+      const theta = map(i, 0, count, 0.5 * Math.PI, maxTheta - Math.PI);
+      const subtype = typeSlots[i % typeSlots.length];
+      let offset = random(offsets);
+      if (subtype === "warHorse") offset = random([-18, -10, 10, 18]);
+      if (subtype === "bannerWaver") offset = random([-14, -8, 8, 14]);
       enemies.push(new Enemy(theta, offset, subtype));
     }
     return;
