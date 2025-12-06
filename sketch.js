@@ -425,6 +425,14 @@ function worldToScreen(theta, r) {
   };
 }
 
+// Helper: the outer escape portal for the core boss fight
+function getBossExit() {
+  // Place the exit bubble near the far end of the visible path but keep it reachable.
+  const theta = Math.max(maxTheta - Math.PI * 0.75, 2 * Math.PI);
+  const r = platformR(theta);
+  return { theta, r };
+}
+
 function platformR(theta) {
   return currentLevelObj().platformCurve(theta);
 }
@@ -736,10 +744,10 @@ class Player {
     // Stage-specific win/lose triggers
     const currentStage = currentLevelObj();
     if (currentStage.isCoreBossLevel) {
+      const bossExit = getBossExit();
       // Reaching the outer exit portal wins the fight
-      const exitTheta = maxTheta - Math.PI * 0.5;
-      const exitR = platformR(exitTheta);
-      const nearExit = this.theta >= exitTheta - 0.3 && Math.abs(currentR - exitR) <= 30;
+      const nearExit =
+        this.theta >= bossExit.theta - 0.3 && Math.abs(currentR - bossExit.r) <= 40;
       if (nearExit) {
         handleBossVictory();
         return;
@@ -1021,6 +1029,8 @@ class Enemy {
       speedMag *= 1.8;
     } else if (type === "bossWarden") {
       speedMag *= 1.7;
+    } else if (type === "bossMini") {
+      speedMag *= 1.9;
     }
 
     this.prevTheta = this.theta;
@@ -1079,6 +1089,9 @@ class Enemy {
     } else if (type === "bossWarden") {
       radialWiggle = 8 * Math.sin(frameCount * 0.16 + this.theta * 1.3);
       radialWiggle += 5 * Math.sin(frameCount * 0.11 + this.offset * 0.6);
+    } else if (type === "bossMini") {
+      radialWiggle = 6 * Math.sin(frameCount * 0.2 + this.theta * 1.5);
+      radialWiggle += 4 * Math.sin(frameCount * 0.12 + this.offset * 0.8);
     } else if (type === "ikon") {
       radialWiggle = 4 * Math.sin(frameCount * 0.12 + this.theta * 0.5);
     }
@@ -1348,6 +1361,19 @@ class Enemy {
         stroke(120, 255, 220);
         strokeWeight(2);
         ellipse(0, -4, 30, 24);
+        break;
+      case "bossMini":
+        // Smaller warden shard that zips along the path
+        noStroke();
+        fill(tint[0], tint[1], tint[2]);
+        ellipse(0, 0, 18, 18);
+        fill(0);
+        ellipse(-3, -2, 3, 3);
+        ellipse(3, -2, 3, 3);
+        stroke(0);
+        strokeWeight(2);
+        noFill();
+        arc(0, 4, 10, 6, 0, Math.PI);
         break;
       case "hoplite":
         // Ghostly hoplite helm shape
@@ -1673,7 +1699,17 @@ function drawSpiral(level) {
   noFill();
   beginShape();
   for (let t = 0; t <= thetaLimit; t += 0.05) {
-    const r = level.platformCurve(t);
+    let r = level.platformCurve(t);
+
+    // Visualize the core pulling the path inward on the boss stage
+    if (level.isCoreBossLevel) {
+      const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
+      const progress = 1 - levelTimeFramesRemaining / total;
+      const extraPull = bossPullOffset * 0.35;
+      const swirl = 12 * progress * Math.sin(t * 2 + frameCount * 0.08);
+      r = Math.max(0, r - extraPull - swirl);
+    }
+
     const pos = worldToScreen(t, r);
     const x = pos.x;
     const y = pos.y;
@@ -1704,17 +1740,21 @@ function drawPortal(level) {
 
   // On the core boss, also draw the outer exit portal
   if (level.isCoreBossLevel) {
-    const exitTheta = maxTheta - Math.PI * 0.5;
-    const exitR = platformR(exitTheta);
-    const pos = worldToScreen(exitTheta, exitR);
-    const exitPulse = 10 * Math.sin(frameCount * 0.07) + 18;
+    const bossExit = getBossExit();
+    const pos = worldToScreen(bossExit.theta, bossExit.r);
+    const exitPulse = 12 * Math.sin(frameCount * 0.07) + 20;
+
+    // Soft glow bubble so it reads as the objective
+    noStroke();
+    fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 120);
+    ellipse(pos.x, pos.y, 46 + exitPulse, 46 + exitPulse);
 
     noFill();
-    stroke(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 220);
+    stroke(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 230);
     strokeWeight(4);
-    ellipse(pos.x, pos.y, 30 + exitPulse, 30 + exitPulse);
+    ellipse(pos.x, pos.y, 34 + exitPulse, 34 + exitPulse);
     strokeWeight(2);
-    ellipse(pos.x, pos.y, 16 + exitPulse * 0.6, 16 + exitPulse * 0.6);
+    ellipse(pos.x, pos.y, 18 + exitPulse * 0.6, 18 + exitPulse * 0.6);
   }
 }
 
@@ -1792,6 +1832,18 @@ function drawEnemies() {
       const d = dist(player.x, player.y, e.x, e.y);
       const sameLevel = Math.abs(player.r - e.r) <= 18; // require roughly same platform level
       if (sameLevel && d < player.radius + 12) {
+        const type = e.subtype || currentLevelObj().enemyType;
+        if (currentLevelObj().isCoreBossLevel && (type === "bossMini" || type === "bossWarden")) {
+          // Drag the player back toward the core as punishment
+          player.theta = Math.max(0.4, player.theta % TWO_PI);
+          player.r = 10;
+          const pos = worldToScreen(player.theta, player.r);
+          player.x = pos.x;
+          player.y = pos.y;
+          player.rVel = 0;
+          loseLife();
+          return;
+        }
         resetPlayerToStart();
       }
     }
@@ -1969,6 +2021,19 @@ function generateEnemies() {
   const level = currentLevelObj();
   const count = level.enemyCount || 6;
   const offsets = level.enemyOffsets || [-30, -10, 10, 30];
+
+  // Core boss: spawn the main Warden plus a fleet of smaller sentinels
+  if (level.isCoreBossLevel) {
+    // Primary boss
+    enemies.push(new Enemy(2 * Math.PI, 0, "bossWarden"));
+
+    const miniCount = 10;
+    for (let i = 0; i < miniCount; i++) {
+      const theta = map(i, 0, miniCount, 1.5 * Math.PI, maxTheta - Math.PI * 1.5);
+      enemies.push(new Enemy(theta, 0, "bossMini"));
+    }
+    return;
+  }
 
   // Stage 1 mixes Neanderthals with boulders; other stages use their default type
   if (currentLevel === 0) {
