@@ -354,6 +354,23 @@ const levels = [
   },
 ];
 
+const levelMusicFiles = [
+  "assets/01-Caveman-Quest.wav",
+  "assets/02-Temple-of-Hanuman.wav",
+  "assets/03-Pharaohs-Tomb.wav",
+  "assets/04-Minotaurs-Labyrinth.wav",
+  "assets/05-March-of-the-Legions.wav",
+  "assets/06-Golden-Mosaics.wav",
+  "assets/07-Dynasty-of-Silk.wav",
+  "assets/08-Paladins-March.wav",
+  "assets/09-Florentine-Dawn.wav",
+  "assets/10-The-Globe-Awakens.wav",
+  "assets/11-City-of-Tomorrow.wav",
+  "assets/12-Chrome-Sakura.wav",
+  "assets/13-Temporal-Collapse.wav",
+  "assets/14-Event-Horizon.wav",
+];
+
 const CHRONO_CORE_INDEX = levels.length - 2; // Final Stage — Chrono Core
 const BOSS_LEVEL_INDEX = levels.length - 1; // Time Warden
 const BOSS_SHARD_GOAL = 60;
@@ -377,6 +394,10 @@ let pulseHeadTheta = 0;
 let pulseCooldown = 0;
 let bossPullOffset = 0;
 let bossDurationTotal = LEVEL_TIME_LIMIT_FRAMES;
+let currentMusic = null;
+const musicCache = [];
+const musicLoadState = [];
+let musicMuted = false;
 
 // --- Helpers for current level & platform curve ---
 
@@ -435,6 +456,52 @@ function getBossExit() {
 
 function platformR(theta) {
   return currentLevelObj().platformCurve(theta);
+}
+
+function stopCurrentMusic() {
+  if (currentMusic) {
+    currentMusic.stop();
+    currentMusic = null;
+  }
+}
+
+function playLevelMusic(idx) {
+  if (musicMuted) return;
+  if (typeof loadSound !== "function") return;
+
+  const file = levelMusicFiles[idx];
+  stopCurrentMusic();
+  if (!file) return;
+
+  const cached = musicCache[idx];
+  if (cached) {
+    cached.setLoop(true);
+    cached.setVolume(0.65);
+    if (!cached.isPlaying()) {
+      cached.play();
+    }
+    currentMusic = cached;
+    return;
+  }
+
+  if (musicLoadState[idx] === "loading") return;
+  musicLoadState[idx] = "loading";
+
+  musicCache[idx] = loadSound(
+    file,
+    (snd) => {
+      musicCache[idx] = snd;
+      musicLoadState[idx] = "ready";
+      snd.setLoop(true);
+      snd.setVolume(0.65);
+      currentMusic = snd;
+      snd.play();
+    },
+    () => {
+      musicCache[idx] = null;
+      musicLoadState[idx] = "error";
+    }
+  );
 }
 
 // Find the closest inner spiral ring along the same radial direction.
@@ -2095,11 +2162,13 @@ function keyPressed() {
 
 function draw() {
   if (GAME_STATE === "MAP") {
+    stopCurrentMusic();
     drawMapScreen();
     return;
   }
 
   if (GAME_STATE === "GAME_OVER") {
+    stopCurrentMusic();
     drawGameOverScreen();
     return;
   }
@@ -2562,6 +2631,7 @@ function startLevel(idx) {
     pulseCooldown = 60; // first pulse quickly
     level.pulseIntervalFrames = level.pulseIntervalFrames || 10 * 60; // tighten repeat cadence
   }
+  playLevelMusic(idx);
   introTimer = INTRO_DURATION;
   GAME_STATE = "INTRO";
 }
@@ -2900,6 +2970,7 @@ function grantPlaytestUnlock() {
 
 function resetRunProgress() {
   // Reset overall progression, lives, and stage state back to the map.
+  stopCurrentMusic();
   globalShardTotal = 0;
   lives = MAX_LIVES;
   shardsEarnedThisRun = 0;

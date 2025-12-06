@@ -9,6 +9,7 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 3. Use **Left/Right** to run along the spiral and **X/Up/Space** to jump inward toward the portal. Press **Down/C/Alt** to snap-drop to the next outer loop. After earning **30 shards** you unlock a mid-air double jump (press jump again while airborne) that now latches onto inner rings with a short climb-up animation. At **15 shards** press **S/Ctrl** for a 1s invulnerability shield (15s cooldown) and at **45 shards** press **D** for a 2s time-freeze (30s cooldown). Tap **Enter** on the Era Select map to start an unlocked stage (first stage starts unlocked). The canvas fills the window, so you can resize the browser at any point.
 4. Each board runs on a **3:00 timer**; if it expires you lose a life (3 lives per run), drop any shards earned on that board, and return to Era Select.
 5. For playtesting, press **Ctrl + Shift + Alt + '+'** to instantly grant 60 shards and unlock the last two arenas.
+6. Optional music: place your stage tracks in `assets/` using the filenames below; each level will auto-loop its track when loaded.
 
 ## Notes
 
@@ -22,6 +23,25 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 - The playable hero is now a chubby, goggle-wearing time traveler with stronger run/jump animation, radial shadow, outward-facing orientation, left/right-facing flip along the spiral, and animated snap drops/climb-ups between rings; both the player and enemies run at calmer speeds for a more readable pace.
 - The canvas resizes to fill the browser window and recenters the spiral so you can play at any resolution.
 - A full-screen Era Select map lets you choose any unlocked era and see shard progress; each stage opens with a short intro card (era + year/location). Collecting **60 shards** globally unlocks the **Chrono Core** (Stage 13); defeating it unlocks the final **Chrono Boss** arena (Stage 14).
+
+### Optional stage music
+
+Drop matching files into `assets/` to enable looping background music per stage:
+
+1. `01-Caveman-Quest.wav`
+2. `02-Temple-of-Hanuman.wav`
+3. `03-Pharaohs-Tomb.wav`
+4. `04-Minotaurs-Labyrinth.wav`
+5. `05-March-of-the-Legions.wav`
+6. `06-Golden-Mosaics.wav`
+7. `07-Dynasty-of-Silk.wav`
+8. `08-Paladins-March.wav`
+9. `09-Florentine-Dawn.wav`
+10. `10-The-Globe-Awakens.wav`
+11. `11-City-of-Tomorrow.wav`
+12. `12-Chrome-Sakura.wav`
+13. `13-Temporal-Collapse.wav`
+14. `14-Event-Horizon.wav`
 
 ## ChronoSpiral 1.0 roadmap (current pass)
 
