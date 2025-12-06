@@ -389,6 +389,25 @@ function updateMaxThetaForCurrentLevel() {
   }
 }
 
+// Map polar world coordinates to screen coordinates, allowing us to visually
+// "zoom" the Chaos Core boss stage without altering physics. For the boss, we
+// compress radii so the core stays dominant while gameplay still uses full
+// world-space distances.
+function worldToScreen(theta, r) {
+  const level = currentLevelObj();
+
+  let drawR = r;
+  if (level?.isCoreBossLevel) {
+    const CAMERA_FACTOR = 0.35; // tweak to adjust visual compression on the boss
+    drawR = r * CAMERA_FACTOR;
+  }
+
+  return {
+    x: centerX + drawR * Math.cos(theta),
+    y: centerY + drawR * Math.sin(theta),
+  };
+}
+
 function platformR(theta) {
   return currentLevelObj().platformCurve(theta);
 }
@@ -458,8 +477,9 @@ class Player {
 
     const initialR = platformR(this.theta);
     this.r = initialR;
-    this.x = centerX + initialR * Math.cos(this.theta);
-    this.y = centerY + initialR * Math.sin(this.theta);
+    const startPos = worldToScreen(this.theta, initialR);
+    this.x = startPos.x;
+    this.y = startPos.y;
   }
 
   update() {
@@ -491,15 +511,17 @@ class Player {
       this.rVel = 0;
       this.coyoteFrames = 0;
 
-      this.x = centerX + r * Math.cos(theta);
-      this.y = centerY + r * Math.sin(theta);
+      const climbPos = worldToScreen(theta, r);
+      this.x = climbPos.x;
+      this.y = climbPos.y;
 
       if (this.climbTimer <= 0) {
         this.climbAnimating = false;
         const targetR = platformR(theta);
         this.r = targetR;
-        this.x = centerX + targetR * Math.cos(theta);
-        this.y = centerY + targetR * Math.sin(theta);
+        const targetPos = worldToScreen(theta, targetR);
+        this.x = targetPos.x;
+        this.y = targetPos.y;
         this.onGround = true;
         this.coyoteFrames = 6;
         this.airJumpUsed = false;
@@ -532,16 +554,18 @@ class Player {
       this.rVel = 0;
       this.coyoteFrames = 0;
 
-      this.x = centerX + r * Math.cos(theta);
-      this.y = centerY + r * Math.sin(theta);
+      const dropPos = worldToScreen(theta, r);
+      this.x = dropPos.x;
+      this.y = dropPos.y;
 
       if (this.dropAnimTimer <= 0) {
         this.dropAnimating = false;
 
         const targetR = platformR(theta);
         this.r = targetR;
-        this.x = centerX + targetR * Math.cos(theta);
-        this.y = centerY + targetR * Math.sin(theta);
+        const targetPos = worldToScreen(theta, targetR);
+        this.x = targetPos.x;
+        this.y = targetPos.y;
 
         this.onGround = true;
         this.coyoteFrames = 6;
@@ -686,9 +710,10 @@ class Player {
       }
     }
 
-    // Update position from polar
-    this.x = centerX + currentR * Math.cos(this.theta);
-    this.y = centerY + currentR * Math.sin(this.theta);
+    // Update position from polar with camera mapping for the boss stage
+    const pos = worldToScreen(this.theta, currentR);
+    this.x = pos.x;
+    this.y = pos.y;
     this.r = currentR;
 
     // Warp trigger: close enough to center
@@ -713,26 +738,37 @@ class Player {
   }
 
   snapToOuterSpiral() {
-    // Find the next outer loop of the spiral at the same angular position.
-    const baseTheta = this.theta % TWO_PI;
+    const baseAngle = ((this.theta % TWO_PI) + TWO_PI) % TWO_PI;
     const currentR = this.getR();
+    const level = currentLevelObj();
 
     let bestTheta = null;
     let bestR = null;
 
-    for (let k = 1; k <= 4; k++) {
-      const candidateTheta = baseTheta + TWO_PI * k;
-      if (candidateTheta > maxTheta) break;
+    const isBoss = level && level.isCoreBossLevel;
 
-      const candidateR = platformR(candidateTheta);
-      if (candidateR > currentR + 25) {
-        bestTheta = candidateTheta;
-        bestR = candidateR;
-        break;
+    const maxLoops = isBoss ? 24 : 6; // how many rings to scan
+    const minGap = isBoss ? 8 : 25; // ignore micro drops
+    const maxGap = isBoss ? 140 : 80; // allow big jumps on boss
+
+    for (let k = 1; k <= maxLoops; k++) {
+      const candidateTheta = baseAngle + TWO_PI * k;
+      if (!isBoss && candidateTheta > maxTheta) break;
+
+      const ringR = platformR(candidateTheta);
+      if (ringR > currentR) {
+        const diff = ringR - currentR;
+        if (diff >= minGap && diff <= maxGap) {
+          bestTheta = candidateTheta;
+          bestR = ringR;
+          break;
+        }
       }
     }
 
-    if (bestTheta === null) return false;
+    if (bestTheta == null) {
+      return false;
+    }
 
     this.dropAnimating = true;
     this.dropFromR = currentR;
@@ -1025,8 +1061,9 @@ class Enemy {
     const spinDir = deltaThetaSigned >= 0 ? 1 : -1;
     this.rollAngle = (this.rollAngle + spinDir * (pathDistance / Math.max(this.radius, 1))) % TWO_PI;
 
-    this.x = centerX + radius * Math.cos(this.theta);
-    this.y = centerY + radius * Math.sin(this.theta);
+    const pos = worldToScreen(this.theta, radius);
+    this.x = pos.x;
+    this.y = pos.y;
     this.r = radius;
 
     // Store last applied speed for reference
@@ -1322,8 +1359,9 @@ class TimeShard {
     const baseR = platformR(this.theta);
     const radius = baseR + this.offset;
     this.r = radius;
-    this.x = centerX + radius * Math.cos(this.theta);
-    this.y = centerY + radius * Math.sin(this.theta);
+    const pos = worldToScreen(this.theta, radius);
+    this.x = pos.x;
+    this.y = pos.y;
   }
 
   update() {
@@ -1594,8 +1632,9 @@ function drawSpiral(level) {
   beginShape();
   for (let t = 0; t <= thetaLimit; t += 0.05) {
     const r = level.platformCurve(t);
-    const x = centerX + r * Math.cos(t);
-    const y = centerY + r * Math.sin(t);
+    const pos = worldToScreen(t, r);
+    const x = pos.x;
+    const y = pos.y;
 
     if (level.isPulseLevel && isInSafeZone(level, t)) {
       strokeWeight(12);
@@ -1650,8 +1689,9 @@ function updateAndDrawPulse(level) {
     beginShape();
     for (let t = 0; t <= pulseHeadTheta; t += 0.05) {
       const r = level.platformCurve(t);
-      const x = centerX + r * Math.cos(t);
-      const y = centerY + r * Math.sin(t);
+      const pos = worldToScreen(t, r);
+      const x = pos.x;
+      const y = pos.y;
       vertex(x, y);
     }
     endShape();
