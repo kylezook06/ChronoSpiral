@@ -2468,22 +2468,207 @@ function drawWrappedLabel(str, x, startY, maxWidth, lineHeight) {
 
 function drawIntroOverlay(level) {
   introTimer--;
+  const t = constrain(1 - introTimer / INTRO_DURATION, 0, 1);
   const alpha = map(introTimer, INTRO_DURATION, 0, 220, 0, true);
 
+  // Dim the playfield while the vignette runs
   fill(0, alpha);
   noStroke();
   rect(0, 0, width, height);
 
+  // Vignette canvas
+  push();
+  translate(width / 2, height / 2 + 40);
+  drawLevelVignette(currentLevel, t);
+  pop();
+
+  // Labels
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(24);
-  text(level.name, width / 2, height / 2 - 20);
+  text(level.name, width / 2, height / 2 - 120);
   textSize(16);
-  text(`YEAR: ${level.year} – ${level.location}`, width / 2, height / 2 + 10);
+  text(`YEAR: ${level.year} – ${level.location}`, width / 2, height / 2 - 90);
 
   if (introTimer <= 0 || keyIsDown(32)) {
     GAME_STATE = "PLAY";
   }
+}
+
+function drawLevelVignette(levelIndex, t) {
+  switch (levelIndex) {
+    case 0:
+      drawStage1Vignette(t);
+      break;
+    default:
+      drawSimpleVignette(t);
+      break;
+  }
+}
+
+function drawSimpleVignette(t) {
+  push();
+  const scaleAmt = lerp(0.6, 1.1, t);
+
+  // Spiral disc
+  push();
+  scale(scaleAmt);
+  noStroke();
+  fill(40, 220, 255, 40);
+  ellipse(0, 0, 140, 140);
+  stroke(40, 220, 255);
+  strokeWeight(4);
+  noFill();
+  for (let r = 20; r <= 60; r += 10) {
+    ellipse(0, 0, r * 2, r * 2);
+  }
+  pop();
+
+  // Tiny player silhouette running right
+  drawIntroPlayer(-50 + t * 60, 30, 0.9, 0, true);
+  pop();
+}
+
+function drawStage1Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Shard glow behind the guards
+  push();
+  const shardPulse = 30 + 10 * Math.sin(frameCount * 0.12);
+  noStroke();
+  fill(100, 255, 255, 180);
+  ellipse(0, -40, shardPulse, shardPulse * 1.2);
+  fill(0, 40);
+  ellipse(0, -40, shardPulse * 0.5, shardPulse * 0.6);
+  pop();
+
+  drawIntroNeanderthal(-50, 25, 1.5, -1);
+  drawIntroNeanderthal(50, 25, 1.5, 1);
+
+  if (t < 0.33) {
+    // Spin in from the left
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -80, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, 40, 1.4, spin, false);
+  } else if (t < 0.66) {
+    // Stunned + boulder throw
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-80, 40, 1.4, 0, false);
+
+    const bx = lerp(40, -40, p);
+    const by = 20 - Math.sin(p * Math.PI) * 60;
+    drawIntroBoulder(bx, by, 1.3);
+  } else {
+    // Run off right as the boulder lands
+    const p = (t - 0.66) / 0.34;
+    const x = lerp(-80, width * 0.45, p);
+    drawIntroPlayer(x, 40, 1.4, 0, true);
+
+    drawIntroBoulder(-40, 20, 1.3);
+  }
+}
+
+function drawIntroPlayer(x, y, scaleAmt, spinAngle = 0, runRight = false) {
+  push();
+  translate(x, y);
+  rotate(spinAngle);
+  scale(scaleAmt);
+
+  // Body
+  noStroke();
+  fill(40, 140, 255);
+  rectMode(CENTER);
+  rect(0, -18, 24, 26, 6);
+
+  // Head
+  fill(245, 220, 190);
+  ellipse(0, -36, 18, 20);
+
+  // Beard
+  fill(60, 40, 20);
+  arc(0, -32, 14, 12, 0, Math.PI);
+
+  // Eyes
+  fill(0);
+  ellipse(-4, -37, 2.5, 2.5);
+  ellipse(4, -37, 2.5, 2.5);
+
+  // Arms
+  stroke(245, 220, 190);
+  strokeWeight(3);
+  const armOffset = runRight ? 4 : 0;
+  line(-10, -22, -16 - armOffset, -18);
+  line(10, -22, 16 + armOffset, -18);
+
+  // Legs + feet
+  stroke(0, 0, 0, 180);
+  strokeWeight(3);
+  line(-6, -6, -8 - armOffset, 4);
+  line(6, -6, 8 + armOffset, 4);
+
+  noStroke();
+  fill(255, 230, 80);
+  rect(-8 - armOffset, 6, 8, 4, 2);
+  rect(8 + armOffset, 6, 8, 4, 2);
+
+  pop();
+}
+
+function drawIntroNeanderthal(x, y, scaleAmt, facing = 1) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  // Body
+  noStroke();
+  fill(145, 90, 50);
+  rectMode(CENTER);
+  rect(0, -18, 26, 30, 6);
+
+  // Head
+  fill(210, 170, 130);
+  ellipse(0, -38, 20, 22);
+
+  // Hair / brow ridge
+  fill(80, 50, 30);
+  arc(0, -40, 22, 16, Math.PI, 0);
+
+  // Eyes + frown
+  fill(0);
+  ellipse(-5, -39, 3, 3);
+  ellipse(5, -39, 3, 3);
+  noFill();
+  stroke(0);
+  strokeWeight(2);
+  arc(0, -33, 10, 6, Math.PI, 0);
+
+  // Arms
+  stroke(210, 170, 130);
+  strokeWeight(3);
+  line(-10, -24, -16, -16);
+  line(10, -24, 16, -16);
+
+  pop();
+}
+
+function drawIntroBoulder(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(140, 100, 70);
+  ellipse(0, 0, 26, 24);
+
+  stroke(70, 40, 20);
+  strokeWeight(2);
+  noFill();
+  ellipse(0, 0, 26, 24);
+  line(-8, -3, 6, -1);
+  line(-5, 3, 5, 4);
+
+  pop();
 }
 
 // --- Drawing helpers ---

@@ -36,6 +36,24 @@
         color: #b6d7ff;
       }
 
+      .logo-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .logo {
+        width: 140px;
+        height: auto;
+        image-rendering: auto;
+      }
+
+      .subtitle {
+        font-size: 0.9rem;
+        letter-spacing: 1px;
+      }
+
       canvas {
         border: 3px solid #2bd1a1;
         image-rendering: pixelated;
@@ -54,7 +72,14 @@
   </head>
   <body>
     <header>
-      <h1>ChronoSpiral: Radial DK Prototype</h1>
+      <div class="logo-stack">
+        <img
+          src="https://kylezook.com/wp-content/uploads/2025/12/ChronoSpiral-logo-480x480.png"
+          alt="ChronoSpiral"
+          class="logo"
+        />
+        <div class="subtitle">Era Select</div>
+      </div>
       <p>
         Era Select: Enter • Run: Arrows • Jump: X/Up/Space • Drop: Down/C/Alt • Powers: S/Ctrl (15) Invuln,
         D (45) Freeze • 3:00 per board
