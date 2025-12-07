@@ -316,10 +316,12 @@ const levels = [
     isPulseLevel: true,
     pulseIntervalFrames: 2 * 60,
     pulseSpeed: 0.13,
+    // Four clearly separated safe pads so they appear around the spiral
     safeZones: [
-      { thetaStart: 2.0 * Math.PI, thetaEnd: 2.3 * Math.PI },
-      { thetaStart: 4.0 * Math.PI, thetaEnd: 4.3 * Math.PI },
-      { thetaStart: 6.0 * Math.PI, thetaEnd: 6.35 * Math.PI },
+      { thetaStart: 1.25 * Math.PI, thetaEnd: 1.55 * Math.PI },
+      { thetaStart: 2.9 * Math.PI, thetaEnd: 3.2 * Math.PI },
+      { thetaStart: 4.55 * Math.PI, thetaEnd: 4.85 * Math.PI },
+      { thetaStart: 6.2 * Math.PI, thetaEnd: 6.5 * Math.PI },
     ],
     // Wild, unstable curve for the finale
     platformCurve: (theta) => {
@@ -779,6 +781,14 @@ class Player {
     } else {
       this.onGround = false;
       currentR = projectedR;
+    }
+
+    // When the boss spiral is collapsing inward, keep the traveler glued to the
+    // shrinking path so he doesn't drift outside the visible coils.
+    if (currentLevelObj().isCoreBossLevel && currentR > targetR + band) {
+      currentR = targetR;
+      this.rVel = 0;
+      this.onGround = true;
     }
 
     // Coyote time: brief grace period after leaving a platform
@@ -2566,8 +2576,9 @@ function drawEnemies() {
       const hitRadius = player.radius + 12 + (e.hitboxBoost || 0);
       if (sameLevel && d < hitRadius) {
         const type = e.subtype || currentLevelObj().enemyType;
-        if (currentLevelObj().isCoreBossLevel && (type === "bossMini" || type === "bossWarden")) {
-          // Drag the player back toward the core as punishment, but don't instantly cost a life.
+        if (currentLevelObj().isCoreBossLevel) {
+          // Any hit on the boss arena drags the traveler back toward the core
+          // but does not cost a life.
           playSfx("hit");
 
           const resetTheta = Math.max(0.4, player.theta % TWO_PI);
