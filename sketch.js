@@ -349,7 +349,14 @@ const levels = [
     platformCurve: (theta) => {
       const base = spiralA * theta;
       const ripple = 34 * Math.sin(2.2 * theta + Math.sin(theta));
-      return Math.max(0, base + ripple - bossPullOffset);
+      const raw = base + ripple;
+
+      // Collapse the entire spiral toward the core over the fight using the pull offset.
+      const bossMax = 220; // must stay in sync with bossMaxPull
+      const t = Math.max(0, Math.min(bossPullOffset / bossMax, 1)); // 0 → 1 as the timer drains
+      const collapsed = raw * (1 - t);
+
+      return Math.max(0, collapsed);
     },
   },
 ];
@@ -2349,9 +2356,9 @@ function drawSpiral(level) {
     if (level.isCoreBossLevel) {
       const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
       const progress = 1 - levelTimeFramesRemaining / total;
-      const extraPull = bossPullOffset * 0.35;
       const swirl = 12 * progress * Math.sin(t * 2 + frameCount * 0.08);
-      r = Math.max(0, r - extraPull - swirl);
+      // Platform curve already encodes collapse; this is just a subtle wobble.
+      r = Math.max(0, r - swirl);
     }
 
     const pos = worldToScreen(t, r);
@@ -2505,14 +2512,16 @@ function drawEnemies() {
       if (sameLevel && d < hitRadius) {
         const type = e.subtype || currentLevelObj().enemyType;
         if (currentLevelObj().isCoreBossLevel && (type === "bossMini" || type === "bossWarden")) {
-          // Drag the player back toward the core as punishment
+          // Drag the player back toward the core as punishment, but don't instantly cost a life.
           player.theta = Math.max(0.4, player.theta % TWO_PI);
           player.r = 10;
           const pos = worldToScreen(player.theta, player.r);
           player.x = pos.x;
           player.y = pos.y;
           player.rVel = 0;
-          loseLife();
+
+          // Brief invulnerability so back-to-back hits don't chain-punish immediately.
+          invulnFrames = 60;
           return;
         }
         resetPlayerToStart();
