@@ -16,6 +16,7 @@ let bossCameraScale = 1; // dynamic camera scale for the core boss fight
 let player;
 let currentLevel = 0;
 let currentLevelIndex = 0;
+const TIME_WARDEN_PULL_MAX = 220;
 
 const MAX_LIVES = 3;
 let lives = MAX_LIVES;
@@ -345,14 +346,14 @@ const levels = [
     difficulty: { gravityScale: 1.2, runSpeedScale: 1.32, enemySpeedScale: 1.6 },
     isCoreBossLevel: true,
     bossDurationFrames: 60 * 60,
-    bossMaxPull: 220,
+    bossMaxPull: TIME_WARDEN_PULL_MAX,
     platformCurve: (theta) => {
       const base = spiralA * theta;
       const ripple = 34 * Math.sin(2.2 * theta + Math.sin(theta));
       const raw = base + ripple;
 
       // Collapse the entire spiral toward the core over the fight using the pull offset.
-      const bossMax = 220; // must stay in sync with bossMaxPull
+      const bossMax = TIME_WARDEN_PULL_MAX; // must stay in sync with bossMaxPull
       const t = Math.max(0, Math.min(bossPullOffset / bossMax, 1)); // 0 → 1 as the timer drains
       const collapsed = raw * (1 - t);
 
@@ -377,6 +378,11 @@ const levelMusicFiles = [
   "assets/13-Temporal-Collapse.wav",
   "assets/14-Event-Horizon.wav",
 ];
+
+const sfxFiles = {
+  hit: "assets/Time-Glitch-Moment.wav",
+  jump: "assets/Jump-Platform-Leap.wav",
+};
 
 const CHRONO_CORE_INDEX = levels.length - 2; // Final Stage — Chrono Core
 const BOSS_LEVEL_INDEX = levels.length - 1; // Time Warden
@@ -405,6 +411,7 @@ let currentMusic = null;
 const musicCache = [];
 const musicLoadState = [];
 let musicMuted = false;
+const sfxCache = {};
 
 // --- Helpers for current level & platform curve ---
 
@@ -507,6 +514,32 @@ function playLevelMusic(idx) {
     () => {
       musicCache[idx] = null;
       musicLoadState[idx] = "error";
+    }
+  );
+}
+
+function playSfx(key) {
+  if (typeof loadSound !== "function") return;
+  const file = sfxFiles[key];
+  if (!file) return;
+
+  const cached = sfxCache[key];
+  if (cached) {
+    cached.stop();
+    cached.setVolume(0.8);
+    cached.play();
+    return;
+  }
+
+  sfxCache[key] = loadSound(
+    file,
+    (snd) => {
+      sfxCache[key] = snd;
+      snd.setVolume(0.8);
+      snd.play();
+    },
+    () => {
+      sfxCache[key] = null;
     }
   );
 }
@@ -758,6 +791,7 @@ class Player {
     const downPressed = downKeyDown && !this.downHeld;
 
     if (this.coyoteFrames > 0 && jumpPressed) {
+      playSfx("jump");
       this.rVel = this.jumpStrength;
       this.onGround = false;
       this.coyoteFrames = 0;
@@ -767,12 +801,14 @@ class Player {
       // Air jump only after earning enough shards
       const innerRing = findInnerRing(this.theta, currentR);
       if (innerRing) {
+        playSfx("jump");
         this.airJumpUsed = true;
         this.startClimbToInnerRing(innerRing.theta, innerRing.r);
         this.jumpHeld = jumpKeyDown;
         this.downHeld = downKeyDown;
         return;
       }
+      playSfx("jump");
       this.rVel = this.jumpStrength * 1.6;
       this.airJumpUsed = true;
       currentR += this.rVel;
@@ -2487,9 +2523,17 @@ function updateBossPull(level) {
 
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
   const progress = 1 - levelTimeFramesRemaining / total;
-  const eased = progress * progress; // starts gentle, speeds up as time runs out
-  const maxPull = level.bossMaxPull || 200;
-  bossPullOffset = constrain(maxPull * eased, 0, maxPull);
+  const timeFactor = progress * progress; // starts gentle, speeds up as time runs out
+
+  // As the traveler runs farther from the core, the collapse accelerates.
+  const playerR = player ? player.getR() : 0;
+  const outerBaseline = spiralA * BASE_MAX_THETA;
+  const distanceRatio = outerBaseline > 0 ? constrain(playerR / outerBaseline, 0, 1) : 0;
+  const distanceFactor = 0.8 + distanceRatio * 0.8; // 0.8..1.6 multiplier
+
+  const maxPull = level.bossMaxPull || TIME_WARDEN_PULL_MAX;
+  const pull = maxPull * Math.min(1, timeFactor * distanceFactor);
+  bossPullOffset = constrain(pull, 0, maxPull);
 }
 
 function drawEnemies() {
@@ -2513,8 +2557,12 @@ function drawEnemies() {
         const type = e.subtype || currentLevelObj().enemyType;
         if (currentLevelObj().isCoreBossLevel && (type === "bossMini" || type === "bossWarden")) {
           // Drag the player back toward the core as punishment, but don't instantly cost a life.
-          player.theta = Math.max(0.4, player.theta % TWO_PI);
-          player.r = 10;
+          playSfx("hit");
+
+          const resetTheta = Math.max(0.4, player.theta % TWO_PI);
+          const safeR = Math.max(60, platformR(resetTheta) + 20);
+          player.theta = resetTheta;
+          player.r = safeR;
           const pos = worldToScreen(player.theta, player.r);
           player.x = pos.x;
           player.y = pos.y;
@@ -2524,6 +2572,7 @@ function drawEnemies() {
           invulnFrames = 60;
           return;
         }
+        playSfx("hit");
         resetPlayerToStart();
       }
     }
