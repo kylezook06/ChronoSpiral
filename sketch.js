@@ -13,6 +13,7 @@ const BOSS_MAX_THETA = 60 * Math.PI; // effectively endless spiral for the core 
 let maxTheta = BASE_MAX_THETA;
 let bossCameraScale = 1; // dynamic camera scale for the core boss fight
 let bossCollapseRate = 1; // how fast the Time Warden spiral is "eaten"
+let mapLogo;
 
 let player;
 let currentLevel = 0;
@@ -28,6 +29,7 @@ const START_THETA_FACTOR = 0.9; // start near the outer edge
 let GAME_STATE = "MAP"; // MAP | INTRO | PLAY | GAME_OVER
 let introTimer = 0;
 const INTRO_DURATION = 120; // frames (~2 seconds)
+let postIntroFadeFrames = 0;
 
 const LEVEL_TIME_LIMIT_FRAMES = 3 * 60 * 60; // 3 minutes at 60fps
 let levelTimeFramesRemaining = LEVEL_TIME_LIMIT_FRAMES;
@@ -2251,6 +2253,11 @@ function setup() {
   centerX = width / 2;
   centerY = height / 2;
 
+  // Title logo for the era select screen
+  mapLogo = loadImage("assets/ChronoSpiral-logo-480.png", () => {}, () => {
+    mapLogo = null;
+  });
+
   resetRunProgress();
   textFont("Courier New");
   GAME_STATE = "MAP";
@@ -2329,6 +2336,12 @@ function draw() {
     return;
   }
 
+  if (GAME_STATE === "INTRO") {
+    stopCurrentMusic();
+    drawIntroOverlay(currentLevelObj());
+    return;
+  }
+
   if (invulnFrames > 0) invulnFrames--;
   if (freezeFrames > 0) freezeFrames--;
   if (invulnCooldown > 0) invulnCooldown--;
@@ -2353,8 +2366,9 @@ function draw() {
   drawEnemies();
 
   if (GAME_STATE === "PLAY") {
-    // While the player is in the time-warp animation, don't drain the timer.
-    if (!player.warpAnimating) {
+    // While the player is in the time-warp animation or fading in from the
+    // intro, don't drain the timer.
+    if (!player.warpAnimating && postIntroFadeFrames <= 0) {
       levelTimeFramesRemaining--;
       if (levelTimeFramesRemaining <= 0) {
         handleLevelTimeout();
@@ -2372,25 +2386,48 @@ function draw() {
     rect(0, 0, width, height);
   }
 
-  drawHUD(level);
-
-  if (GAME_STATE === "INTRO") {
-    drawIntroOverlay(level);
+  if (postIntroFadeFrames > 0) {
+    const fadeAlpha = map(postIntroFadeFrames, 24, 0, 255, 0, true);
+    noStroke();
+    fill(0, fadeAlpha);
+    rect(0, 0, width, height);
+    postIntroFadeFrames = Math.max(0, postIntroFadeFrames - 1);
   }
+
+  drawHUD(level);
 }
 
 function drawMapScreen() {
   background(8, 8, 20);
   fill(255);
   textAlign(CENTER, TOP);
-  textSize(24);
-  text("CHRONOSPIRAL: ERA SELECT", width / 2, 40);
-  textSize(14);
-  text("LEFT/RIGHT: choose • ENTER: travel • ESC: exit level", width / 2, 70);
+
+  let headerBottom = 60;
+  if (mapLogo) {
+    push();
+    imageMode(CENTER);
+    const maxW = width * 0.65;
+    const maxH = height * 0.24;
+    const scale = Math.min(maxW / mapLogo.width, maxH / mapLogo.height, 1);
+    const w = mapLogo.width * scale;
+    const h = mapLogo.height * scale;
+    image(mapLogo, width / 2, 40 + h / 2, w, h);
+    headerBottom = 40 + h;
+    pop();
+  } else {
+    textSize(24);
+    text("ChronoSpiral", width / 2, 32);
+    headerBottom = 60;
+  }
+
+  textSize(18);
+  text("Era Select", width / 2, headerBottom + 10);
+  textSize(12);
+  text("LEFT/RIGHT: choose • ENTER: travel • ESC: exit level", width / 2, headerBottom + 30);
   text(
     `Time Shards: ${globalShardTotal}  •  Chaos Core unlock at ${BOSS_SHARD_GOAL}`,
     width / 2,
-    90
+    headerBottom + 46
   );
 
   const rows = 2;
@@ -2399,7 +2436,10 @@ function drawMapScreen() {
   const rightMargin = 80;
   const availableWidth = Math.max(width - leftMargin - rightMargin, 200);
   const spacingX = cols > 1 ? availableWidth / (cols - 1) : 0;
-  const rowY = [height * 0.42, height * 0.65];
+  const rowStart = headerBottom + 90;
+  const availableHeight = Math.max(height - rowStart - 120, 160);
+  const rowSpacing = rows > 1 ? availableHeight / (rows - 1) : 0;
+  const rowY = [rowStart, rowStart + rowSpacing];
 
   for (let i = 0; i < levels.length; i++) {
     const row = Math.floor(i / cols);
@@ -2467,31 +2507,34 @@ function drawWrappedLabel(str, x, startY, maxWidth, lineHeight) {
 }
 
 function drawIntroOverlay(level) {
+  background(0);
   introTimer--;
   const t = constrain(1 - introTimer / INTRO_DURATION, 0, 1);
-  const alpha = map(introTimer, INTRO_DURATION, 0, 220, 0, true);
 
-  // Dim the playfield while the vignette runs
-  fill(0, alpha);
-  noStroke();
-  rect(0, 0, width, height);
+  const fadeFrames = 20;
+  const vignetteAlpha = introTimer > fadeFrames ? 1 : introTimer / fadeFrames;
 
   // Vignette canvas
   push();
   translate(width / 2, height / 2 + 40);
+  drawingContext.globalAlpha = vignetteAlpha;
   drawLevelVignette(currentLevel, t);
   pop();
 
   // Labels
+  push();
+  drawingContext.globalAlpha = vignetteAlpha;
   fill(255);
   textAlign(CENTER, CENTER);
   textSize(24);
   text(level.name, width / 2, height / 2 - 120);
   textSize(16);
   text(`YEAR: ${level.year} – ${level.location}`, width / 2, height / 2 - 90);
+  pop();
 
   if (introTimer <= 0 || keyIsDown(32)) {
     GAME_STATE = "PLAY";
+    postIntroFadeFrames = 24;
   }
 }
 
@@ -3029,6 +3072,7 @@ function startLevel(idx) {
   currentLevel = idx;
   selectedLevelIndex = idx;
   updateMaxThetaForCurrentLevel();
+  postIntroFadeFrames = 0;
   resetPlayerToStart();
   generateEnemies();
   generateShards();

@@ -24,46 +24,28 @@
         text-align: center;
       }
 
-      header h1 {
-        margin: 0;
-        font-size: 1.2rem;
-        letter-spacing: 1px;
-      }
-
-      header p {
-        margin: 4px 0 0;
-        font-size: 0.7rem;
-        color: #b6d7ff;
-      }
-
       .logo-stack {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
 
       .logo {
-        width: 140px;
+        width: 480px;
         height: auto;
+        max-width: 90vw;
         image-rendering: auto;
       }
 
       .subtitle {
-        font-size: 0.9rem;
+        font-size: 1rem;
         letter-spacing: 1px;
       }
 
       canvas {
         border: 3px solid #2bd1a1;
         image-rendering: pixelated;
-      }
-
-      footer {
-        margin: 10px 0 16px;
-        font-size: 0.7rem;
-        color: #7ebeff;
-        text-align: center;
       }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/p5@1.11.1/lib/p5.min.js"></script>
@@ -73,21 +55,10 @@
   <body>
     <header>
       <div class="logo-stack">
-        <img
-          src="https://kylezook.com/wp-content/uploads/2025/12/ChronoSpiral-logo-480x480.png"
-          alt="ChronoSpiral"
-          class="logo"
-        />
+        <img src="assets/ChronoSpiral-logo-480.png" alt="ChronoSpiral" class="logo" />
         <div class="subtitle">Era Select</div>
       </div>
-      <p>
-        Era Select: Enter • Run: Arrows • Jump: X/Up/Space • Drop: Down/C/Alt • Powers: S/Ctrl (15) Invuln,
-        D (45) Freeze • 3:00 per board
-      </p>
     </header>
     <main></main>
-    <footer>
-      Early concept demo: radial gravity + era-shaped curves, era-specific enemies, and Time Shards. Warp to advance eras.
-    </footer>
   </body>
 </html>

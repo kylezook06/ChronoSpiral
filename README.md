@@ -23,6 +23,7 @@ A p5.js (1.11.x) playground for a radial time-travel platformer with outward "gr
 - The playable hero is now a chubby, goggle-wearing time traveler with stronger run/jump animation, radial shadow, outward-facing orientation, left/right-facing flip along the spiral, and animated snap drops/climb-ups between rings; both the player and enemies run at calmer speeds for a more readable pace.
 - The canvas resizes to fill the browser window and recenters the spiral so you can play at any resolution.
 - A full-screen Era Select map lets you choose any unlocked era and see shard progress; each stage opens with a short intro card (era + year/location). Collecting **60 shards** globally unlocks the **Chrono Core** (Stage 13); defeating it unlocks the final **Chrono Boss** arena (Stage 14).
+- The Era Select header will show `assets/ChronoSpiral-logo-480.png` (recommended 480×270) if present; otherwise it falls back to a text title.
 
 ### Optional stage music
 
