@@ -12,6 +12,7 @@ const BASE_MAX_THETA = 10 * Math.PI; // standard stage length
 const BOSS_MAX_THETA = 60 * Math.PI; // effectively endless spiral for the core boss
 let maxTheta = BASE_MAX_THETA;
 let bossCameraScale = 1; // dynamic camera scale for the core boss fight
+let bossCollapseRate = 1; // how fast the Time Warden spiral is "eaten"
 
 let player;
 let currentLevel = 0;
@@ -379,6 +380,7 @@ const levelMusicFiles = [
 const sfxFiles = {
   hit: "assets/Time-Glitch-Moment.wav",
   jump: "assets/Jump-Platform-Leap.wav",
+  warp: "assets/Time-Warp.wav",
 };
 
 const CHRONO_CORE_INDEX = levels.length - 2; // Final Stage — Chrono Core
@@ -391,6 +393,14 @@ const INVULN_DURATION = 60; // frames
 const FREEZE_DURATION = 120; // frames
 const INVULN_COOLDOWN_FRAMES = 15 * 60; // 15 seconds at 60fps
 const FREEZE_COOLDOWN_FRAMES = 30 * 60; // 30 seconds at 60fps
+const EXTRA_LIFE_SHARD_STEP = 60;
+
+let invulnUnlocked = false;
+let freezeUnlocked = false;
+let doubleJumpUnlocked = false;
+let extraLivesAwarded = 0;
+let unlockMessage = "";
+let unlockMessageTimer = 0;
 
 const enemies = [];
 const shards = [];
@@ -648,6 +658,12 @@ class Player {
     this.dropAnimFrames = 16;
     this.dropAnimTimer = 0;
 
+    // Time-warp animation when reaching the core
+    this.warpAnimating = false;
+    this.warpTimer = 0;
+    this.warpDuration = 180; // 3 seconds at 60fps
+    this.warpStartR = 0;
+
     const initialR = platformR(this.theta);
     this.r = initialR;
     const startPos = worldToScreen(this.theta, initialR);
@@ -659,6 +675,12 @@ class Player {
     const level = currentLevelObj();
     const gravity = 0.22 * (level.difficulty?.gravityScale ?? 1); // radial outward acceleration
     const runSpeed = 0.035 * (level.difficulty?.runSpeedScale ?? 1); // scaled per-level pace
+
+    // If we're in a time-warp animation, override normal physics
+    if (this.warpAnimating) {
+      this.updateWarpAnimation();
+      return;
+    }
 
     // Handle climb tween before normal physics
     if (this.climbAnimating) {
@@ -916,6 +938,43 @@ class Player {
         return;
       }
     } else if (currentR < 35) {
+      // For stages 1–13 (everything except the Time Warden), play a time-warp
+      // animation instead of immediately warping.
+      if (!this.warpAnimating) {
+        this.startWarpAnimation();
+      }
+      return;
+    }
+  }
+
+  startWarpAnimation() {
+    if (this.warpAnimating) return;
+    this.warpAnimating = true;
+    this.warpTimer = this.warpDuration;
+    this.warpStartR = this.getR();
+    this.rVel = 0;
+    this.onGround = false;
+    this.coyoteFrames = 0;
+    playSfx("warp");
+  }
+
+  updateWarpAnimation() {
+    if (!this.warpAnimating) return;
+
+    this.warpTimer--;
+    const t = constrain(1 - this.warpTimer / this.warpDuration, 0, 1);
+
+    // Spin quickly and spiral inward to the core
+    this.theta += 0.45;
+    const r = lerp(this.warpStartR, 10, t);
+    this.r = r;
+
+    const pos = worldToScreen(this.theta, r);
+    this.x = pos.x;
+    this.y = pos.y;
+
+    if (this.warpTimer <= 0) {
+      this.warpAnimating = false;
       warpToNextLevel();
     }
   }
@@ -944,7 +1003,7 @@ class Player {
 
     const isBoss = level && level.isCoreBossLevel;
 
-    const maxLoops = isBoss ? 24 : 6; // how many rings to scan
+    const maxLoops = isBoss ? 30 : 6; // how many rings to scan (covers full boss path)
     const minGap = isBoss ? 8 : 25; // ignore micro drops
     const maxGap = isBoss ? 260 : 80; // allow big jumps on boss
 
@@ -978,6 +1037,12 @@ class Player {
     this.rVel = 0;
     this.coyoteFrames = 0;
     this.airJumpUsed = false;
+
+    // On the Time Warden stage, every intentional drop accelerates the collapse.
+    if (currentLevelObj().isCoreBossLevel) {
+      bossCollapseRate *= 2;
+      bossCollapseRate = min(bossCollapseRate, 16);
+    }
 
     return true;
   }
@@ -2233,7 +2298,8 @@ function keyPressed() {
       invulnCooldown <= 0 &&
       invulnFrames <= 0
     ) {
-      invulnFrames = INVULN_DURATION;
+      const bonus = Math.floor(globalShardTotal / 15) * 60; // +1s per 15 shards
+      invulnFrames = INVULN_DURATION + bonus;
       invulnCooldown = INVULN_COOLDOWN_FRAMES;
     }
 
@@ -2287,14 +2353,18 @@ function draw() {
   drawEnemies();
 
   if (GAME_STATE === "PLAY") {
-    levelTimeFramesRemaining--;
-    if (levelTimeFramesRemaining <= 0) {
-      handleLevelTimeout();
-      return;
+    // While the player is in the time-warp animation, don't drain the timer.
+    if (!player.warpAnimating) {
+      levelTimeFramesRemaining--;
+      if (levelTimeFramesRemaining <= 0) {
+        handleLevelTimeout();
+        return;
+      }
     }
     player.update();
   }
   player.draw();
+  drawUnlockBanner();
 
   if (freezeFrames > 0) {
     noStroke();
@@ -2585,10 +2655,13 @@ function updateBossPull(level) {
   }
 
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
-  const progress = 1 - levelTimeFramesRemaining / total;
+  const baseProgress = 1 - levelTimeFramesRemaining / total; // 0 → 1 over time
 
-  // Smooth, time-only progress: 0 → 1 over the fight
-  const eased = progress * progress;
+  // Each drop multiplies bossCollapseRate, accelerating the collapse.
+  const effective = constrain(baseProgress * bossCollapseRate, 0, 1);
+
+  // Slight easing so it still feels organic
+  const eased = effective * effective;
 
   bossPullOffset = constrain(eased, 0, 1);
 }
@@ -2606,7 +2679,7 @@ function drawEnemies() {
     e.draw();
 
     // Simple collision: distance-based
-    if (GAME_STATE === "PLAY" && invulnFrames <= 0) {
+    if (GAME_STATE === "PLAY" && invulnFrames <= 0 && !player.warpAnimating) {
       const d = dist(player.x, player.y, e.x, e.y);
       const sameLevel = Math.abs(player.r - e.r) <= 18; // require roughly same platform level
       const hitRadius = player.radius + 12 + (e.hitboxBoost || 0);
@@ -2649,6 +2722,7 @@ function drawShards() {
         globalShardTotal++;
         shardsEarnedThisRun++;
         checkChronoCoreUnlock();
+        handleShardMilestones();
       }
     }
   });
@@ -2721,6 +2795,21 @@ function drawHUD(level) {
   text(`Lives: ${lives}`, width - 16, 28);
 }
 
+function drawUnlockBanner() {
+  if (unlockMessageTimer <= 0 || !unlockMessage) return;
+  const alpha = map(unlockMessageTimer, 0, 120, 0, 220, true);
+  textAlign(CENTER, CENTER);
+  textSize(32);
+  stroke(0, alpha);
+  strokeWeight(4);
+  fill(255, 240, 150, alpha);
+  text(unlockMessage, width / 2, height * 0.22);
+  unlockMessageTimer--;
+  if (unlockMessageTimer <= 0) {
+    unlockMessage = "";
+  }
+}
+
 // --- Level / game flow ---
 
 function warpToNextLevel() {
@@ -2764,6 +2853,9 @@ function startLevel(idx) {
     ? level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES
     : LEVEL_TIME_LIMIT_FRAMES;
   levelTimeFramesRemaining = bossDurationTotal;
+  if (level.isCoreBossLevel) {
+    bossCollapseRate = 1;
+  }
   shardsEarnedThisRun = 0;
   if (level.isPulseLevel) {
     pulseActive = false;
@@ -2779,6 +2871,7 @@ function startLevel(idx) {
 function loseLife() {
   globalShardTotal = Math.max(0, globalShardTotal - shardsEarnedThisRun);
   shardsEarnedThisRun = 0;
+  bossCollapseRate = 1;
   lives = Math.max(0, lives - 1);
 
   if (lives <= 0) {
@@ -2800,6 +2893,7 @@ function handleLevelTimeout() {
 
 function handleBossVictory() {
   bossPullOffset = 0;
+  bossCollapseRate = 1;
   shardsEarnedThisRun = 0;
   GAME_STATE = "MAP";
 }
@@ -3101,11 +3195,42 @@ function checkChronoCoreUnlock() {
   }
 }
 
+function showUnlockMessage(text) {
+  unlockMessage = text;
+  unlockMessageTimer = 120;
+}
+
+function handleShardMilestones() {
+  if (!invulnUnlocked && globalShardTotal >= INVULN_SHARD_THRESHOLD) {
+    invulnUnlocked = true;
+    showUnlockMessage("Invulnerability Unlocked!");
+  }
+
+  if (!freezeUnlocked && globalShardTotal >= FREEZE_SHARD_THRESHOLD) {
+    freezeUnlocked = true;
+    showUnlockMessage("Time Freeze Unlocked!");
+  }
+
+  if (!doubleJumpUnlocked && globalShardTotal >= DOUBLE_JUMP_SHARD_THRESHOLD) {
+    doubleJumpUnlocked = true;
+    showUnlockMessage("Double Jump Unlocked!");
+  }
+
+  const lifeMilestone = Math.floor(globalShardTotal / EXTRA_LIFE_SHARD_STEP);
+  if (lifeMilestone > extraLivesAwarded) {
+    const gained = lifeMilestone - extraLivesAwarded;
+    lives += gained;
+    extraLivesAwarded = lifeMilestone;
+    showUnlockMessage(gained > 1 ? `Extra Lives +${gained}!` : "Extra Life!" );
+  }
+}
+
 function grantPlaytestUnlock() {
   globalShardTotal = Math.max(globalShardTotal, BOSS_SHARD_GOAL);
   checkChronoCoreUnlock();
   unlockedLevels[BOSS_LEVEL_INDEX] = true;
   selectedLevelIndex = Math.max(selectedLevelIndex, CHRONO_CORE_INDEX);
+  handleShardMilestones();
 }
 
 function resetRunProgress() {
@@ -3113,6 +3238,7 @@ function resetRunProgress() {
   stopCurrentMusic();
   globalShardTotal = 0;
   lives = MAX_LIVES;
+  extraLivesAwarded = 0;
   shardsEarnedThisRun = 0;
   invulnFrames = 0;
   freezeFrames = 0;
@@ -3122,6 +3248,12 @@ function resetRunProgress() {
   pulseHeadTheta = 0;
   pulseCooldown = 0;
   bossPullOffset = 0;
+  bossCollapseRate = 1;
+  invulnUnlocked = false;
+  freezeUnlocked = false;
+  doubleJumpUnlocked = false;
+  unlockMessage = "";
+  unlockMessageTimer = 0;
 
   // All eras are playable from the start except the Chaos Core and final boss
   unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
