@@ -524,14 +524,23 @@ function playSfx(key) {
   if (!file) return;
 
   const cached = sfxCache[key];
-  if (cached) {
+
+  // If a previous load errored, don't keep retrying every frame.
+  if (cached === "error") return;
+
+  // While a sound is loading, skip until the async load finishes.
+  if (cached === "loading") return;
+
+  if (cached && typeof cached.play === "function") {
     cached.stop();
     cached.setVolume(0.8);
     cached.play();
     return;
   }
 
-  sfxCache[key] = loadSound(
+  // Kick off an async load and mark as loading to avoid undefined cache usage.
+  sfxCache[key] = "loading";
+  loadSound(
     file,
     (snd) => {
       sfxCache[key] = snd;
@@ -539,7 +548,7 @@ function playSfx(key) {
       snd.play();
     },
     () => {
-      sfxCache[key] = null;
+      sfxCache[key] = "error";
     }
   );
 }
@@ -2523,16 +2532,18 @@ function updateBossPull(level) {
 
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
   const progress = 1 - levelTimeFramesRemaining / total;
-  const timeFactor = progress * progress; // starts gentle, speeds up as time runs out
+  // Time pressure starts gentle, but distance from the core accelerates the collapse.
+  const timeFactor = progress * progress; // ramps up as the timer drains
 
-  // As the traveler runs farther from the core, the collapse accelerates.
   const playerR = player ? player.getR() : 0;
   const outerBaseline = spiralA * BASE_MAX_THETA;
   const distanceRatio = outerBaseline > 0 ? constrain(playerR / outerBaseline, 0, 1) : 0;
-  const distanceFactor = 0.8 + distanceRatio * 0.8; // 0.8..1.6 multiplier
+
+  // Blend time + distance so running far from the core speeds up the pull dramatically.
+  const combined = constrain(timeFactor * 0.6 + distanceRatio * 1.2, 0, 1);
 
   const maxPull = level.bossMaxPull || TIME_WARDEN_PULL_MAX;
-  const pull = maxPull * Math.min(1, timeFactor * distanceFactor);
+  const pull = maxPull * combined;
   bossPullOffset = constrain(pull, 0, maxPull);
 }
 
@@ -2560,7 +2571,7 @@ function drawEnemies() {
           playSfx("hit");
 
           const resetTheta = Math.max(0.4, player.theta % TWO_PI);
-          const safeR = Math.max(60, platformR(resetTheta) + 20);
+          const safeR = Math.max(120, platformR(resetTheta) + 60);
           player.theta = resetTheta;
           player.r = safeR;
           const pos = worldToScreen(player.theta, player.r);
