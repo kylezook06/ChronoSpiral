@@ -783,12 +783,11 @@ class Player {
       currentR = projectedR;
     }
 
-    // When the boss spiral is collapsing inward, keep the traveler glued to the
-    // shrinking path so he doesn't drift outside the visible coils.
-    if (currentLevelObj().isCoreBossLevel && currentR > targetR + band) {
+    // On the Time Warden stage, once grounded, always stay welded to the
+    // shrinking path so the collapse can't jiggle the traveler off-lane.
+    if (currentLevelObj().isCoreBossLevel && this.onGround) {
       currentR = targetR;
       this.rVel = 0;
-      this.onGround = true;
     }
 
     // Coyote time: brief grace period after leaving a platform
@@ -2542,19 +2541,13 @@ function updateBossPull(level) {
 
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
   const progress = 1 - levelTimeFramesRemaining / total;
-  // Time pressure starts gentle, but distance from the core accelerates the collapse.
-  const timeFactor = progress * progress; // ramps up as the timer drains
 
-  const playerR = player ? player.getR() : 0;
-  const outerBaseline = spiralA * BASE_MAX_THETA;
-  const distanceRatio = outerBaseline > 0 ? constrain(playerR / outerBaseline, 0, 1) : 0;
-
-  // Blend time + distance so running far from the core speeds up the pull dramatically.
-  const combined = constrain(timeFactor * 0.6 + distanceRatio * 1.2, 0, 1);
+  // Smooth, time-only collapse: ease in as the timer drains so the spiral
+  // steadily compresses without feedback jitters from player radius.
+  const eased = progress * progress; // 0 → 1 over the fight
 
   const maxPull = level.bossMaxPull || TIME_WARDEN_PULL_MAX;
-  const pull = maxPull * combined;
-  bossPullOffset = constrain(pull, 0, maxPull);
+  bossPullOffset = constrain(maxPull * eased, 0, maxPull);
 }
 
 function drawEnemies() {
