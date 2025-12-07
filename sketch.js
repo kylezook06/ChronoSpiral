@@ -2337,7 +2337,7 @@ function draw() {
   }
 
   if (GAME_STATE === "INTRO") {
-    stopCurrentMusic();
+    // Keep level music playing during interstitials
     drawIntroOverlay(currentLevelObj());
     return;
   }
