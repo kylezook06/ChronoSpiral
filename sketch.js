@@ -352,14 +352,9 @@ const levels = [
     platformCurve: (theta) => {
       const base = spiralA * theta;
       const ripple = 34 * Math.sin(2.2 * theta + Math.sin(theta));
-      const raw = base + ripple;
-
-      // Collapse the entire spiral toward the core over the fight using the pull offset.
-      const bossMax = TIME_WARDEN_PULL_MAX; // must stay in sync with bossMaxPull
-      const t = Math.max(0, Math.min(bossPullOffset / bossMax, 1)); // 0 → 1 as the timer drains
-      const collapsed = raw * (1 - t);
-
-      return Math.max(0, collapsed);
+      // Keep the full path shape here; the collapse will be handled by a growing
+      // core hazard instead of scaling the whole spiral down.
+      return Math.max(0, base + ripple);
     },
   },
 ];
@@ -462,11 +457,46 @@ function worldToScreen(theta, r) {
   };
 }
 
+// Growing core radius for the Time Warden fight
+function getBossCoreRadius() {
+  const base = 40; // initial hazard size
+  const extra = 200; // growth over the fight
+
+  const level = currentLevelObj();
+  if (!level || !level.isCoreBossLevel) return base;
+
+  const t = bossPullOffset; // 0 → 1 as the timer drains
+  return base + extra * t;
+}
+
 // Helper: the outer escape portal for the core boss fight
 function getBossExit() {
   // Place the exit bubble near the far end of the visible path but keep it reachable.
   const theta = Math.max(maxTheta - Math.PI * 0.75, 2 * Math.PI);
-  const r = platformR(theta);
+  let r = platformR(theta);
+
+  const level = currentLevelObj();
+  if (level && level.isCoreBossLevel) {
+    const coreR = getBossCoreRadius();
+    if (r < coreR + 100) {
+      r = coreR + 100;
+    }
+  }
+
+  return { theta, r };
+}
+
+// Safe-ish respawn point when tagged by boss hazards
+function getBossRespawn() {
+  let theta = 3 * Math.PI; // a few loops out
+  theta = constrain(theta, 0, maxTheta);
+
+  let r = platformR(theta);
+  const coreR = getBossCoreRadius();
+  if (r < coreR + 80) {
+    r = coreR + 80;
+  }
+
   return { theta, r };
 }
 
@@ -873,7 +903,6 @@ class Player {
     const currentStage = currentLevelObj();
     if (currentStage.isCoreBossLevel) {
       const bossExit = getBossExit();
-      // Reaching the outer exit portal wins the fight
       const nearExit =
         this.theta >= bossExit.theta - 0.3 && Math.abs(currentR - bossExit.r) <= 40;
       if (nearExit) {
@@ -881,8 +910,8 @@ class Player {
         return;
       }
 
-      // Falling into the core costs a life
-      if (currentR < 35) {
+      const coreR = getBossCoreRadius();
+      if (currentR < coreR) {
         loseLife();
         return;
       }
@@ -2401,18 +2430,23 @@ function isInSafeZone(level, theta) {
 
 function drawSpiral(level) {
   const thetaLimit = level?.isCoreBossLevel ? BOSS_MAX_THETA : maxTheta;
+  const coreR = level?.isCoreBossLevel ? getBossCoreRadius() : 0;
+  const thetaStart = level?.isCoreBossLevel ? Math.max(0, coreR / spiralA - Math.PI) : 0;
   noFill();
   beginShape();
-  for (let t = 0; t <= thetaLimit; t += 0.05) {
+  for (let t = thetaStart; t <= thetaLimit; t += 0.05) {
     let r = level.platformCurve(t);
 
-    // Visualize the core pulling the path inward on the boss stage
+    // Skip segments that have already been eaten by the growing core
+    if (level.isCoreBossLevel && r < coreR) {
+      continue;
+    }
+
     if (level.isCoreBossLevel) {
       const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
       const progress = 1 - levelTimeFramesRemaining / total;
       const swirl = 12 * progress * Math.sin(t * 2 + frameCount * 0.08);
-      // Platform curve already encodes collapse; this is just a subtle wobble.
-      r = Math.max(0, r - swirl);
+      r = Math.max(coreR, r - swirl);
     }
 
     const pos = worldToScreen(t, r);
@@ -2458,19 +2492,23 @@ function drawPulseSafePads(level) {
 
 function drawPortal(level) {
   noStroke();
-  fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 200);
-  const pulse = 8 * Math.sin(frameCount * 0.05) + 24;
-  ellipse(centerX, centerY, 32 + pulse, 32 + pulse);
-  fill(255, 255, 255, 180);
-  ellipse(centerX, centerY, 16 + pulse * 0.3, 16 + pulse * 0.3);
 
-  // On the core boss, also draw the outer exit portal
   if (level.isCoreBossLevel) {
+    // Growing core in the center
+    const coreR = getBossCoreRadius();
+    const pulse = 6 * Math.sin(frameCount * 0.08);
+
+    fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 220);
+    ellipse(centerX, centerY, coreR * 2 + pulse, coreR * 2 + pulse);
+
+    fill(255, 255, 255, 160);
+    ellipse(centerX, centerY, coreR * 1.1 + pulse * 0.5, coreR * 1.1 + pulse * 0.5);
+
+    // Outer exit portal
     const bossExit = getBossExit();
     const pos = worldToScreen(bossExit.theta, bossExit.r);
     const exitPulse = 12 * Math.sin(frameCount * 0.07) + 20;
 
-    // Soft glow bubble so it reads as the objective
     noStroke();
     fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 120);
     ellipse(pos.x, pos.y, 46 + exitPulse, 46 + exitPulse);
@@ -2481,6 +2519,13 @@ function drawPortal(level) {
     ellipse(pos.x, pos.y, 34 + exitPulse, 34 + exitPulse);
     strokeWeight(2);
     ellipse(pos.x, pos.y, 18 + exitPulse * 0.6, 18 + exitPulse * 0.6);
+  } else {
+    // Standard portal
+    fill(level.palette.portal[0], level.palette.portal[1], level.palette.portal[2], 200);
+    const pulse = 8 * Math.sin(frameCount * 0.05) + 24;
+    ellipse(centerX, centerY, 32 + pulse, 32 + pulse);
+    fill(255, 255, 255, 180);
+    ellipse(centerX, centerY, 16 + pulse * 0.3, 16 + pulse * 0.3);
   }
 }
 
@@ -2542,12 +2587,10 @@ function updateBossPull(level) {
   const total = bossDurationTotal || level.bossDurationFrames || LEVEL_TIME_LIMIT_FRAMES;
   const progress = 1 - levelTimeFramesRemaining / total;
 
-  // Smooth, time-only collapse: ease in as the timer drains so the spiral
-  // steadily compresses without feedback jitters from player radius.
-  const eased = progress * progress; // 0 → 1 over the fight
+  // Smooth, time-only progress: 0 → 1 over the fight
+  const eased = progress * progress;
 
-  const maxPull = level.bossMaxPull || TIME_WARDEN_PULL_MAX;
-  bossPullOffset = constrain(maxPull * eased, 0, maxPull);
+  bossPullOffset = constrain(eased, 0, 1);
 }
 
 function drawEnemies() {
@@ -2570,18 +2613,18 @@ function drawEnemies() {
       if (sameLevel && d < hitRadius) {
         const type = e.subtype || currentLevelObj().enemyType;
         if (currentLevelObj().isCoreBossLevel) {
-          // Any hit on the boss arena drags the traveler back toward the core
-          // but does not cost a life.
+          // Boss hits yank the traveler outward without costing a life.
           playSfx("hit");
 
-          const resetTheta = Math.max(0.4, player.theta % TWO_PI);
-          const safeR = Math.max(120, platformR(resetTheta) + 60);
-          player.theta = resetTheta;
-          player.r = safeR;
+          const respawn = getBossRespawn();
+          player.theta = respawn.theta;
+          player.r = respawn.r;
           const pos = worldToScreen(player.theta, player.r);
           player.x = pos.x;
           player.y = pos.y;
           player.rVel = 0;
+          player.onGround = false;
+          player.coyoteFrames = 6;
 
           // Brief invulnerability so back-to-back hits don't chain-punish immediately.
           invulnFrames = 60;
