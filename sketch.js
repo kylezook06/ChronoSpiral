@@ -2430,16 +2430,16 @@ function drawMapScreen() {
     headerBottom + 46
   );
 
-  const rows = 2;
+  const rows = 3;
   const cols = Math.ceil(levels.length / rows);
   const leftMargin = 80;
   const rightMargin = 80;
   const availableWidth = Math.max(width - leftMargin - rightMargin, 200);
   const spacingX = cols > 1 ? availableWidth / (cols - 1) : 0;
-  const rowStart = headerBottom + 90;
-  const availableHeight = Math.max(height - rowStart - 120, 160);
+  const rowStart = headerBottom + 70;
+  const availableHeight = Math.max(height - rowStart - 80, 140);
   const rowSpacing = rows > 1 ? availableHeight / (rows - 1) : 0;
-  const rowY = [rowStart, rowStart + rowSpacing];
+  const rowY = [rowStart, rowStart + rowSpacing, rowStart + rowSpacing * 2];
 
   for (let i = 0; i < levels.length; i++) {
     const row = Math.floor(i / cols);
@@ -2543,6 +2543,12 @@ function drawLevelVignette(levelIndex, t) {
     case 0:
       drawStage1Vignette(t);
       break;
+    case 1:
+      drawStage2Vignette(t);
+      break;
+    case 2:
+      drawStage3Vignette(t);
+      break;
     default:
       drawSimpleVignette(t);
       break;
@@ -2612,6 +2618,123 @@ function drawStage1Vignette(t) {
   }
 }
 
+function drawStage2Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Soft temple backdrop
+  push();
+  noStroke();
+  fill(40, 20, 80, 140);
+  rectMode(CENTER);
+  rect(0, 10, 220, 80, 12);
+  fill(90, 50, 150, 170);
+  rect(0, -10, 140, 40, 8);
+  pop();
+
+  // Meditation platform
+  push();
+  noStroke();
+  fill(40, 120, 80, 180);
+  ellipse(0, 50, 220, 40);
+  pop();
+
+  // Glowing shard behind the sages
+  push();
+  const pulse = 18 + 6 * Math.sin(frameCount * 0.15);
+  noStroke();
+  fill(120, 255, 220, 200);
+  ellipse(0, 0, pulse * 1.3, pulse);
+  pop();
+
+  drawIntroSage(-70, 20, 1.3);
+  drawIntroSage(70, 20, 1.3);
+
+  if (t < 0.33) {
+    // Hero spins in between sages
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -40, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, 40, 1.3, spin, false);
+  } else if (t < 0.66) {
+    // Sages cast lotus orbs
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-40, 40, 1.3, 0, false);
+
+    const orbX1 = lerp(-70, -20, p);
+    const orbX2 = lerp(70, 0, p);
+    drawIntroLotusOrb(orbX1, 10, 1.1);
+    drawIntroLotusOrb(orbX2, 0, 1.1);
+  } else {
+    // Monkeys + orbs chase him off
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-40, width * 0.45, p);
+    drawIntroPlayer(heroX, 40, 1.3, 0, true);
+
+    const monkeyOffset = 40;
+    drawIntroMonkey(-40 - monkeyOffset * p, 42, 1.1, 1);
+    drawIntroMonkey(-10 - monkeyOffset * p, 38, 1.1, 1);
+
+    drawIntroLotusOrb(-20 - 60 * p, 10, 1.0);
+    drawIntroLotusOrb(10 - 40 * p, 0, 1.0);
+  }
+}
+
+function drawStage3Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Desert floor
+  push();
+  noStroke();
+  fill(170, 130, 80, 190);
+  ellipse(0, 60, 260, 60);
+  pop();
+
+  // Pyramids
+  push();
+  noStroke();
+  fill(190, 150, 90, 180);
+  triangle(-120, 30, -40, -30, 40, 30);
+  triangle(20, 30, 90, -10, 160, 30);
+  pop();
+
+  // Sarcophagus center stage
+  const lidPhase = t < 0.4 ? 0 : t < 0.7 ? (t - 0.4) / 0.3 : 1;
+  const lidOffset = lerp(0, -40, lidPhase);
+  drawIntroSarcophagus(0, 20, 1.4, lidOffset);
+
+  if (t < 0.33) {
+    // Hero flying in
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -60, p);
+    const y = lerp(10, -10, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, y, 1.3, spin, true);
+  } else if (t < 0.66) {
+    // Impact + first mummy
+    drawIntroPlayer(-60, -6, 1.2, 0, true);
+
+    push();
+    noStroke();
+    fill(250, 240, 210, 170);
+    ellipse(-10, 30, 40, 20);
+    pop();
+
+    drawIntroMummy(20, 22, 1.1, -1);
+    drawIntroScarab(-10, 36, 1.0);
+  } else {
+    // Chase!
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-40, width * 0.45, p);
+    drawIntroPlayer(heroX, 30, 1.3, 0, true);
+
+    drawIntroMummy(-10 + 80 * p, 28, 1.1, 1);
+    drawIntroMummy(-40 + 60 * p, 24, 1.0, 1);
+
+    drawIntroScarab(-30 + 120 * p, 40, 1.0);
+    drawIntroScarab(-60 + 100 * p, 44, 0.9);
+  }
+}
+
 function drawIntroPlayer(x, y, scaleAmt, spinAngle = 0, runRight = false) {
   push();
   translate(x, y);
@@ -2654,6 +2777,179 @@ function drawIntroPlayer(x, y, scaleAmt, spinAngle = 0, runRight = false) {
   fill(255, 230, 80);
   rect(-8 - armOffset, 6, 8, 4, 2);
   rect(8 + armOffset, 6, 8, 4, 2);
+
+  pop();
+}
+
+function drawIntroSage(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  // Cushion
+  noStroke();
+  fill(60, 150, 110);
+  ellipse(0, 10, 40, 14);
+
+  // Robe
+  fill(215, 160, 110);
+  rectMode(CENTER);
+  rect(0, -2, 20, 26, 6);
+
+  // Head
+  fill(240, 210, 180);
+  ellipse(0, -18, 16, 18);
+
+  // Beard & hair
+  fill(120, 80, 50);
+  arc(0, -14, 14, 12, 0, Math.PI);
+  arc(0, -20, 18, 10, Math.PI, 0);
+
+  // Closed eyes
+  stroke(0);
+  strokeWeight(2);
+  line(-4, -18, -1, -17);
+  line(1, -17, 4, -18);
+
+  // Halo
+  noFill();
+  stroke(255, 230, 160);
+  strokeWeight(2);
+  ellipse(0, -24, 18, 10);
+
+  pop();
+}
+
+function drawIntroLotusOrb(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const pulse = 3 * Math.sin(frameCount * 0.25);
+  noStroke();
+  fill(200, 160, 255, 210);
+  ellipse(0, 0, 20 + pulse, 20 + pulse);
+
+  fill(255, 230, 255);
+  beginShape();
+  for (let i = 0; i < 6; i++) {
+    const a = (TWO_PI / 6) * i;
+    vertex(Math.cos(a) * 8, Math.sin(a) * 8);
+  }
+  endShape(CLOSE);
+
+  pop();
+}
+
+function drawIntroMonkey(x, y, scaleAmt, facing = 1) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  // Tail
+  noFill();
+  stroke(60, 40, 30);
+  strokeWeight(3);
+  bezier(10, -4, 18, -8, 18, 6, 10, 8);
+
+  // Body
+  noStroke();
+  fill(170, 110, 70);
+  ellipse(0, -4, 18, 16);
+
+  // Head
+  fill(210, 160, 120);
+  ellipse(0, -14, 14, 12);
+
+  // Face
+  fill(240, 200, 150);
+  ellipse(0, -12, 10, 8);
+
+  // Eyes / mouth
+  fill(0);
+  ellipse(-3, -13, 2, 2);
+  ellipse(3, -13, 2, 2);
+  noFill();
+  stroke(0);
+  strokeWeight(1.5);
+  arc(0, -10, 6, 3, 0, Math.PI);
+
+  pop();
+}
+
+function drawIntroSarcophagus(x, y, scaleAmt, lidOffset) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  // Base
+  rectMode(CENTER);
+  noStroke();
+  fill(180, 140, 90);
+  rect(0, 10, 70, 26, 10);
+
+  // Face panel
+  fill(220, 190, 130);
+  rect(0, 2, 40, 24, 8);
+
+  // Lid (slides)
+  push();
+  translate(lidOffset, -18);
+  rotate(radians(-6));
+  fill(150, 110, 70);
+  rect(0, 0, 60, 16, 8);
+  pop();
+
+  pop();
+}
+
+function drawIntroMummy(x, y, scaleAmt, facing = 1) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  // Legs
+  stroke(0);
+  strokeWeight(2);
+  line(-4, 10, -4, 16);
+  line(4, 10, 4, 16);
+
+  // Body
+  rectMode(CENTER);
+  noStroke();
+  fill(240, 225, 200);
+  rect(0, 2, 22, 24, 6);
+  stroke(200, 180, 150);
+  strokeWeight(2);
+  line(-10, -2, 10, -4);
+  line(-10, 4, 10, 2);
+
+  // Head
+  noStroke();
+  fill(240, 225, 200);
+  ellipse(0, -12, 16, 14);
+  fill(0);
+  ellipse(-3, -12, 3, 3);
+  ellipse(3, -12, 3, 3);
+
+  pop();
+}
+
+function drawIntroScarab(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(40, 160, 130);
+  ellipse(0, 0, 16, 12);
+  fill(30, 120, 100);
+  ellipse(0, -5, 10, 8);
+
+  stroke(0);
+  strokeWeight(2);
+  line(-8, 4, -4, 0);
+  line(8, 4, 4, 0);
 
   pop();
 }
