@@ -28,7 +28,9 @@ const START_THETA_FACTOR = 0.9; // start near the outer edge
 // Game states
 let GAME_STATE = "MAP"; // MAP | INTRO | PLAY | GAME_OVER
 let introTimer = 0;
-const INTRO_DURATION = 120; // frames (~2 seconds)
+const DEFAULT_INTRO_DURATION = 120; // frames (~2 seconds)
+const LONG_INTRO_DURATION = 180; // slightly longer vignette for Chrono Core
+let introDuration = DEFAULT_INTRO_DURATION;
 let postIntroFadeFrames = 0;
 
 const LEVEL_TIME_LIMIT_FRAMES = 3 * 60 * 60; // 3 minutes at 60fps
@@ -2522,7 +2524,7 @@ function drawWrappedLabel(str, x, startY, maxWidth, lineHeight) {
 function drawIntroOverlay(level) {
   background(0);
   introTimer--;
-  const t = constrain(1 - introTimer / INTRO_DURATION, 0, 1);
+  const t = constrain(1 - introTimer / introDuration, 0, 1);
 
   const fadeFrames = 20;
   const vignetteAlpha = introTimer > fadeFrames ? 1 : introTimer / fadeFrames;
@@ -2588,6 +2590,9 @@ function drawLevelVignette(levelIndex, t) {
       break;
     case 11:
       drawStage12Vignette(t);
+      break;
+    case CHRONO_CORE_INDEX:
+      drawStage13Vignette(t);
       break;
     default:
       drawSimpleVignette(t);
@@ -4166,6 +4171,97 @@ function drawIntroEnergyDisc(x, y, scaleAmt) {
   pop();
 }
 
+function drawStage13Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Dark arena floor
+  push();
+  noStroke();
+  fill(10, 6, 18, 230);
+  ellipse(0, 60, 260, 70);
+  pop();
+
+  // Central chaos core and a raised platform
+  drawIntroChaosCore(0, 10, 1.2, t);
+  drawIntroCorePlatform(80, 34, 1.0);
+
+  if (t < 0.35) {
+    const p = t / 0.35;
+    const x = lerp(-width * 0.45, -20, p);
+    const y = lerp(52, 44, p);
+    const spin = p * TWO_PI * 2;
+    drawIntroPlayer(x, y, 1.1, spin, true);
+  } else if (t < 0.7) {
+    const p = (t - 0.35) / 0.35;
+    const heroShake = Math.sin(frameCount * 0.4) * 2;
+    drawIntroPlayer(-20, 44 + heroShake, 1.1, 0, false);
+
+    drawIntroCoreElectricity(0, 10, 38, 4 + 4 * p);
+  } else {
+    const p = (t - 0.7) / 0.3;
+    const jumpX = lerp(-20, 80, p);
+    const jumpY = lerp(44, 30, p - 0.1);
+    drawIntroPlayer(jumpX, jumpY, 1.1, 0, true);
+
+    drawIntroCoreElectricity(0, 10, 44, 8);
+  }
+}
+
+function drawIntroChaosCore(x, y, scaleAmt, t) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const pulse = 6 * Math.sin(frameCount * 0.25);
+  noStroke();
+
+  fill(150, 60, 200, 130);
+  ellipse(0, 0, 80 + pulse, 80 + pulse);
+
+  fill(120, 255, 220, 230);
+  ellipse(0, 0, 36 + pulse, 26 + pulse);
+
+  fill(255, 250, 210, 230);
+  ellipse(0, 0, 18 + pulse * 0.6, 18 + pulse * 0.6);
+
+  pop();
+}
+
+function drawIntroCorePlatform(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(40, 200, 200, 230);
+  ellipse(0, 0, 40, 14);
+  fill(0, 40);
+  ellipse(0, 2, 22, 8);
+
+  pop();
+}
+
+function drawIntroCoreElectricity(cx, cy, radius, bolts) {
+  push();
+  translate(cx, cy);
+
+  stroke(120, 240, 255);
+  strokeWeight(3);
+  noFill();
+
+  const count = Math.floor(bolts);
+  for (let i = 0; i < count; i++) {
+    const a = (TWO_PI / count) * i + frameCount * 0.12;
+    const x1 = Math.cos(a) * (radius - 6);
+    const y1 = Math.sin(a) * (radius - 6);
+    const x2 = Math.cos(a) * (radius + 4);
+    const y2 = Math.sin(a) * (radius + 4);
+    line(x1, y1, x2, y2);
+  }
+
+  pop();
+}
+
 function drawIntroNeanderthal(x, y, scaleAmt, facing = 1) {
   push();
   translate(x, y);
@@ -4601,7 +4697,8 @@ function startLevel(idx) {
     level.pulseIntervalFrames = level.pulseIntervalFrames || 10 * 60; // tighten repeat cadence
   }
   playLevelMusic(idx);
-  introTimer = INTRO_DURATION;
+  introDuration = idx === CHRONO_CORE_INDEX ? LONG_INTRO_DURATION : DEFAULT_INTRO_DURATION;
+  introTimer = introDuration;
   GAME_STATE = "INTRO";
 }
 
