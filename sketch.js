@@ -2568,6 +2568,12 @@ function drawLevelVignette(levelIndex, t) {
     case 4:
       drawStage5Vignette(t);
       break;
+    case 5:
+      drawStage6Vignette(t);
+      break;
+    case 6:
+      drawStage7Vignette(t);
+      break;
     default:
       drawSimpleVignette(t);
       break;
@@ -3201,6 +3207,286 @@ function drawIntroRoundShield(x, y, scaleAmt) {
   ellipse(0, 0, 12, 12);
   fill(230, 220, 200);
   ellipse(0, 0, 6, 6);
+
+  pop();
+}
+
+function drawStage6Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Golden apse / dome interior
+  push();
+  noStroke();
+  fill(30, 20, 60, 220);
+  arc(0, -10, 260, 150, Math.PI, 0);
+  fill(120, 90, 40, 220);
+  arc(0, -16, 220, 120, Math.PI, 0);
+  pop();
+
+  // Central mosaic glow
+  push();
+  const pulse = 10 + 4 * Math.sin(frameCount * 0.12);
+  noStroke();
+  fill(255, 220, 150, 210);
+  ellipse(0, -24, 80 + pulse, 80 + pulse);
+  pop();
+
+  // Flanking icons and censer
+  drawIntroIkonPanel(-80, 10, 1.25);
+  drawIntroIkonPanel(80, 10, 1.25);
+  drawIntroCenser(0, 40, 1.2);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -30, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, 52, 1.2, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-30, 52, 1.2, 0, false);
+
+    const ringRadius = 32;
+    const baseAng = frameCount * 0.05;
+    for (let i = 0; i < 3; i++) {
+      const a = baseAng + (TWO_PI / 3) * i;
+      const sx = -30 + Math.cos(a) * ringRadius;
+      const sy = 20 + Math.sin(a) * ringRadius;
+      drawIntroMosaicShard(sx, sy, 1.0);
+    }
+
+    drawIntroCenser(0, 40, 1.2 + 0.1 * p);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-30, width * 0.45, p);
+    drawIntroPlayer(heroX, 52, 1.2, 0, true);
+
+    const trailX = heroX - 40;
+    drawIntroMosaicShard(trailX, 28, 1.0);
+    drawIntroMosaicShard(trailX - 24, 40, 0.9);
+
+    drawIntroIkonPanel(-80, 10, 1.25, true);
+    drawIntroIkonPanel(80, 10, 1.25, true);
+  }
+}
+
+function drawIntroIkonPanel(x, y, scaleAmt, eyesGlow = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(240, 210, 150);
+  rect(0, 0, 34, 46, 6);
+  fill(200, 160, 100);
+  rect(0, 0, 26, 32, 4);
+
+  stroke(80, 50, 30);
+  strokeWeight(3);
+  line(0, -10, 0, 10);
+  line(-8, 0, 8, 0);
+
+  if (eyesGlow) {
+    noStroke();
+    const blink = 180 + 50 * Math.sin(frameCount * 0.2);
+    fill(255, 240, 190, blink);
+    ellipse(-5, -4, 3, 3);
+    ellipse(5, -4, 3, 3);
+  }
+
+  pop();
+}
+
+function drawIntroCenser(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const swingDeg = Math.sin(frameCount * 0.1) * 8;
+  push();
+  translate(0, -26);
+  rotate(radians(swingDeg));
+  stroke(230, 220, 200);
+  strokeWeight(2);
+  line(0, 0, 0, 16);
+  pop();
+
+  noStroke();
+  fill(200, 160, 100);
+  ellipse(0, -5, 18, 12);
+  rectMode(CENTER);
+  rect(0, -9, 10, 6, 3);
+
+  fill(255, 240, 210, 160);
+  ellipse(-4, 6, 12, 6);
+  ellipse(3, 10, 10, 5);
+
+  pop();
+}
+
+function drawIntroMosaicShard(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const spin = frameCount * 0.12;
+  rotate(spin);
+  noStroke();
+  fill(255, 220, 150);
+  quad(-6, -2, 6, -2, 4, 3, -4, 4);
+
+  pop();
+}
+
+function drawStage7Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Distant mountains / sky
+  push();
+  noStroke();
+  fill(6, 30, 40, 220);
+  rectMode(CENTER);
+  rect(0, 10, 260, 90, 12);
+  fill(8, 50, 60, 210);
+  beginShape();
+  vertex(-130, 20);
+  vertex(-90, 0);
+  vertex(-40, 18);
+  vertex(10, -4);
+  vertex(60, 16);
+  vertex(110, -2);
+  vertex(130, 16);
+  vertex(130, 50);
+  vertex(-130, 50);
+  endShape(CLOSE);
+  pop();
+
+  // Great Wall segment
+  push();
+  noStroke();
+  fill(50, 90, 90, 230);
+  beginShape();
+  vertex(-130, 46);
+  vertex(-90, 32);
+  vertex(-40, 40);
+  vertex(10, 30);
+  vertex(60, 38);
+  vertex(110, 30);
+  vertex(130, 36);
+  vertex(130, 66);
+  vertex(-130, 66);
+  endShape(CLOSE);
+  pop();
+
+  // Watchtowers
+  push();
+  rectMode(CENTER);
+  noStroke();
+  fill(80, 120, 130, 240);
+  rect(-80, 30, 20, 20, 3);
+  rect(0, 26, 20, 20, 3);
+  rect(80, 30, 20, 20, 3);
+  pop();
+
+  drawIntroLantern(-40, 6, 1.1);
+  drawIntroLantern(40, 2, 1.1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -60, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, 56, 1.2, spin, false);
+
+    const cx = lerp(90, 10, p);
+    drawIntroCrane(cx, 16, 1.0, -1);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+
+    drawIntroPlayer(-60, 56, 1.2, 0, false);
+
+    drawIntroCrane(-20, 20 + 4 * Math.sin(frameCount * 0.15), 1.0, 1);
+    drawIntroCrane(30, 10 + 3 * Math.sin(frameCount * 0.2), 0.9, 1);
+
+    drawIntroLantern(-40, 6, 1.1 + 0.05 * p, true);
+    drawIntroLantern(40, 2, 1.1 + 0.05 * p, true);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-60, width * 0.45, p);
+    drawIntroPlayer(heroX, 56, 1.2, 0, true);
+
+    const guardX = lerp(-10, heroX - 32, p);
+    drawIntroWallGuard(guardX, 44, 1.1);
+
+    drawIntroCrane(heroX - 60, 18, 1.0, 1);
+    drawIntroCrane(heroX - 90, 10, 0.9, 1);
+  }
+}
+
+function drawIntroLantern(x, y, scaleAmt, bright = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const bob = Math.sin(frameCount * 0.18) * 2;
+  translate(0, bob);
+
+  stroke(230, 220, 200);
+  strokeWeight(2);
+  line(0, -18, 0, -26);
+
+  noStroke();
+  const baseAlpha = bright ? 230 : 190;
+  fill(240, 180, 120, baseAlpha);
+  ellipse(0, -6, 20, 26);
+  fill(255, 230, 190, baseAlpha + 20);
+  rectMode(CENTER);
+  rect(0, -6, 14, 6, 3);
+
+  fill(200, 120, 90, baseAlpha);
+  rect(0, 4, 6, 6, 2);
+
+  pop();
+}
+
+function drawIntroCrane(x, y, scaleAmt, facing = 1) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  const flap = Math.sin(frameCount * 0.2) * 6;
+
+  noStroke();
+  fill(225, 240, 255);
+  push();
+  rotate(radians(flap));
+  triangle(-14, 4, 0, -8, 14, 4);
+  pop();
+  ellipse(0, 4, 10, 8);
+  triangle(0, 0, 6, -4, 10, -2);
+
+  pop();
+}
+
+function drawIntroWallGuard(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(120, 160, 190);
+  rect(0, -4, 16, 20, 3);
+
+  fill(230, 210, 180);
+  ellipse(0, -18, 12, 10);
+
+  fill(60, 80, 110);
+  rect(0, -20, 14, 6, 2);
+
+  stroke(80, 60, 40);
+  strokeWeight(2.5);
+  line(6, -10, 14, 4);
+  line(14, 4, 18, -2);
 
   pop();
 }
