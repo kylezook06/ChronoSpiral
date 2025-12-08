@@ -2402,7 +2402,8 @@ function drawMapScreen() {
   fill(255);
   textAlign(CENTER, TOP);
 
-  let headerBottom = 60;
+  // --- HEADER / LOGO ---
+  let headerBottom = 40;
   if (mapLogo) {
     push();
     imageMode(CENTER);
@@ -2411,43 +2412,55 @@ function drawMapScreen() {
     const scale = Math.min(maxW / mapLogo.width, maxH / mapLogo.height, 1);
     const w = mapLogo.width * scale;
     const h = mapLogo.height * scale;
-    image(mapLogo, width / 2, 40 + h / 2, w, h);
-    headerBottom = 40 + h;
+    image(mapLogo, width / 2, 60 + h / 2, w, h);
+    headerBottom = 60 + h;
     pop();
   } else {
-    textSize(24);
-    text("ChronoSpiral", width / 2, 32);
-    headerBottom = 60;
+    textSize(32);
+    text("CHRONO SPIRAL", width / 2, 40);
+    headerBottom = 40 + 32;
   }
 
   textSize(18);
   text("Era Select", width / 2, headerBottom + 10);
-  textSize(12);
+  textSize(14);
   text("LEFT/RIGHT: choose • ENTER: travel • ESC: exit level", width / 2, headerBottom + 30);
   text(
     `Time Shards: ${globalShardTotal}  •  Chaos Core unlock at ${BOSS_SHARD_GOAL}`,
     width / 2,
-    headerBottom + 46
+    headerBottom + 50
   );
 
-  const rows = 3;
-  const cols = Math.ceil(levels.length / rows);
+  const topTextY = headerBottom + 50;
+  const firstRowY = topTextY + 40;
+  const rowSpacing = 110;
+  const secondRowY = firstRowY + rowSpacing;
+  const thirdRowY = secondRowY + rowSpacing;
+
+  const cols = 6;
   const leftMargin = 80;
   const rightMargin = 80;
   const availableWidth = Math.max(width - leftMargin - rightMargin, 200);
   const spacingX = cols > 1 ? availableWidth / (cols - 1) : 0;
-  const rowStart = headerBottom + 70;
-  const availableHeight = Math.max(height - rowStart - 80, 140);
-  const rowSpacing = rows > 1 ? availableHeight / (rows - 1) : 0;
-  const rowY = [rowStart, rowStart + rowSpacing, rowStart + rowSpacing * 2];
 
   for (let i = 0; i < levels.length; i++) {
-    const row = Math.floor(i / cols);
-    const col = i % cols;
-    if (row >= rows) break;
+    let x;
+    let y;
 
-    const x = leftMargin + col * spacingX;
-    const y = rowY[row];
+    if (i < 6) {
+      const col = i;
+      x = leftMargin + col * spacingX;
+      y = firstRowY;
+    } else if (i < 12) {
+      const col = i - 6;
+      x = leftMargin + col * spacingX;
+      y = secondRowY;
+    } else {
+      const bottomIndex = i - 12;
+      const bottomSpacing = 160;
+      y = thirdRowY;
+      x = width / 2 + (bottomIndex === 0 ? -bottomSpacing / 2 : bottomSpacing / 2);
+    }
 
     const isUnlocked = unlockedLevels[i];
     const isSelected = i === selectedLevelIndex;
@@ -2548,6 +2561,12 @@ function drawLevelVignette(levelIndex, t) {
       break;
     case 2:
       drawStage3Vignette(t);
+      break;
+    case 3:
+      drawStage4Vignette(t);
+      break;
+    case 4:
+      drawStage5Vignette(t);
       break;
     default:
       drawSimpleVignette(t);
@@ -2950,6 +2969,238 @@ function drawIntroScarab(x, y, scaleAmt) {
   strokeWeight(2);
   line(-8, 4, -4, 0);
   line(8, 4, 4, 0);
+
+  pop();
+}
+
+function drawStage4Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Courtyard + columns
+  push();
+  noStroke();
+  fill(160, 145, 110, 220);
+  ellipse(0, 60, 240, 60);
+  pop();
+
+  push();
+  stroke(230, 220, 200);
+  strokeWeight(6);
+  line(-110, 10, -110, -40);
+  line(0, 10, 0, -40);
+  line(110, 10, 110, -40);
+  strokeWeight(3);
+  line(-120, -40, 120, -40);
+  pop();
+
+  push();
+  noFill();
+  stroke(120, 210, 255, 200);
+  strokeWeight(3);
+  for (let r = 10; r <= 36; r += 6) {
+    ellipse(0, -40, r * 2, r * 2);
+  }
+  pop();
+
+  drawIntroHoplite(-60, 26, 1.3, 1);
+  drawIntroHoplite(60, 26, 1.3, -1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -20, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, 40, 1.3, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-20, 40, 1.3, 0, false);
+
+    const tilt = radians(10 + 10 * p);
+    drawIntroHoplite(-60, 26, 1.3, 1, tilt);
+    drawIntroHoplite(60, 26, 1.3, -1, -tilt);
+
+    drawIntroAmphora(-5, 52, 1.0, Math.sin(frameCount * 0.25) * 0.15);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-20, width * 0.45, p);
+    drawIntroPlayer(heroX, 40, 1.3, 0, true);
+
+    const chaserX1 = lerp(-60, heroX - 40, p);
+    const chaserX2 = lerp(60, heroX - 10, p);
+    drawIntroHoplite(chaserX1, 26, 1.3, 1);
+    drawIntroHoplite(chaserX2, 26, 1.3, 1);
+
+    const amphoraX = lerp(-5, heroX - 60, p);
+    drawIntroAmphora(amphoraX, 52, 1.0, 0);
+  }
+}
+
+function drawIntroHoplite(x, y, scaleAmt, facing = 1, spearTilt = 0) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  // Shield
+  noStroke();
+  fill(230, 210, 170);
+  ellipse(-6, -4, 22, 22);
+  fill(180, 130, 80);
+  ellipse(-6, -4, 10, 10);
+
+  // Body
+  fill(210, 160, 100);
+  rectMode(CENTER);
+  rect(4, -10, 18, 26, 6);
+
+  // Helmet / crest
+  fill(210, 200, 180);
+  ellipse(4, -24, 16, 14);
+  fill(200, 60, 60);
+  rect(4, -32, 4, 10, 2);
+
+  // Eye slit
+  stroke(60, 40, 30);
+  strokeWeight(2);
+  line(0, -24, 8, -24);
+
+  // Spear
+  push();
+  translate(10, -16);
+  rotate(spearTilt);
+  stroke(200, 200, 190);
+  strokeWeight(3);
+  line(0, 0, 24, -16);
+  triangle(24, -16, 24, -10, 30, -13);
+  pop();
+
+  pop();
+}
+
+function drawIntroAmphora(x, y, scaleAmt, wobble = 0) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+  rotate(wobble);
+
+  noStroke();
+  fill(190, 140, 90);
+  ellipse(0, 0, 18, 24);
+  rect(0, -8, 10, 12, 4);
+  rect(0, 6, 8, 8, 4);
+
+  stroke(120, 80, 50);
+  strokeWeight(2);
+  noFill();
+  arc(-6, -4, 6, 10, HALF_PI, HALF_PI + Math.PI / 1.3);
+  arc(6, -4, 6, 10, -HALF_PI - Math.PI / 1.3, -HALF_PI);
+
+  pop();
+}
+
+function drawStage5Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Roman road
+  push();
+  noStroke();
+  fill(120, 100, 80, 220);
+  rectMode(CENTER);
+  rect(0, 60, 260, 40, 10);
+  pop();
+
+  // Colosseum silhouette
+  push();
+  noStroke();
+  fill(160, 130, 90, 180);
+  arc(0, 0, 220, 120, PI, TWO_PI);
+  fill(8, 8, 20);
+  for (let x = -80; x <= 80; x += 30) {
+    rect(x, 10, 16, 30);
+  }
+  pop();
+
+  drawIntroLegionary(-40, 26, 1.3, 1);
+  drawIntroLegionary(20, 26, 1.3, 1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = 0;
+    const y = lerp(-40, 30, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, y, 1.3, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(0, 30, 1.3, 0, false);
+
+    const upTilt = radians(20 * p);
+    drawIntroLegionary(-40, 26, 1.3, 1, upTilt);
+    drawIntroLegionary(20, 26, 1.3, 1, -upTilt);
+
+    const sx = lerp(100, 40, p);
+    drawIntroRoundShield(sx, 52, 1.0);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(0, -width * 0.45, p);
+    drawIntroPlayer(heroX, 30, 1.3, 0, false);
+
+    const chaserX1 = lerp(-40, heroX + 30, p);
+    const chaserX2 = lerp(20, heroX + 60, p);
+    drawIntroLegionary(chaserX1, 26, 1.3, -1);
+    drawIntroLegionary(chaserX2, 26, 1.3, -1);
+
+    const sx = lerp(40, heroX + 80, p);
+    drawIntroRoundShield(sx, 52, 1.0);
+  }
+}
+
+function drawIntroLegionary(x, y, scaleAmt, facing = 1, shieldTilt = 0) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  // Body & armor
+  noStroke();
+  fill(190, 60, 60);
+  rectMode(CENTER);
+  rect(0, -8, 20, 26, 6);
+
+  // Helmet
+  fill(210, 200, 180);
+  ellipse(0, -24, 16, 14);
+  fill(200, 80, 50);
+  rect(0, -32, 6, 10, 2);
+
+  // Shield
+  push();
+  translate(-8, -4);
+  rotate(shieldTilt);
+  fill(210, 190, 150);
+  rect(0, 0, 14, 26, 4);
+  fill(160, 80, 60);
+  rect(0, 0, 6, 16, 3);
+  pop();
+
+  // Spear
+  stroke(200, 200, 190);
+  strokeWeight(3);
+  line(10, -16, 24, -26);
+  line(24, -26, 30, -36);
+
+  pop();
+}
+
+function drawIntroRoundShield(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+  rotate(frameCount * 0.2);
+
+  noStroke();
+  fill(210, 190, 150);
+  ellipse(0, 0, 22, 22);
+  fill(160, 80, 60);
+  ellipse(0, 0, 12, 12);
+  fill(230, 220, 200);
+  ellipse(0, 0, 6, 6);
 
   pop();
 }
