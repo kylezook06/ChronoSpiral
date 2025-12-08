@@ -2583,6 +2583,12 @@ function drawLevelVignette(levelIndex, t) {
     case 9:
       drawStage10Vignette(t);
       break;
+    case 10:
+      drawStage11Vignette(t);
+      break;
+    case 11:
+      drawStage12Vignette(t);
+      break;
     default:
       drawSimpleVignette(t);
       break;
@@ -3893,6 +3899,269 @@ function drawIntroCannonball(x, y, scaleAmt) {
   ellipse(0, 0, 14, 14);
   fill(90, 90, 110);
   ellipse(0, 0, 6, 6);
+
+  pop();
+}
+
+function drawStage11Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  push();
+  noStroke();
+  fill(20, 20, 40, 230);
+  rectMode(CENTER);
+  rect(0, 0, 260, 90, 8);
+  fill(35, 35, 70, 240);
+  rect(0, 10, 260, 50, 6);
+
+  // Storefronts
+  fill(80, 100, 150, 240);
+  rect(-70, 6, 80, 40, 4);
+  rect(60, 6, 80, 40, 4);
+
+  // Neon “ARCADE” sign
+  fill(250, 80, 160);
+  rect(60, -10, 60, 12, 3);
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(10);
+  text("ARCADE", 60, -10);
+  pop();
+
+  push();
+  noStroke();
+  fill(60, 60, 70, 240);
+  rect(0, 60, 260, 36, 6);
+  fill(210, 210, 220, 240);
+  rect(0, 52, 260, 6);
+  pop();
+
+  drawIntroSkater(-60, 46, 1.2, 1);
+  drawIntroSkater(30, 46, 1.2, -1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -20, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, 46, 1.2, spin, false);
+
+    drawIntroBoombox(-90 + 40 * p, 50, 1.0);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-20, 46, 1.2, 0, false);
+
+    const sk1x = lerp(-60, -30, p);
+    const sk2x = lerp(30, 0, p);
+    drawIntroSkater(sk1x, 46, 1.2, 1);
+    drawIntroSkater(sk2x, 46, 1.2, -1);
+
+    const cartX = lerp(90, 40, p);
+    drawIntroShoppingCart(cartX, 52, 1.0);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-20, width * 0.45, p);
+    drawIntroPlayer(heroX, 46, 1.2, 0, true);
+
+    drawIntroSkater(heroX - 40, 46, 1.2, 1);
+    drawIntroSkater(heroX - 70, 46, 1.2, 1);
+
+    const cartX = heroX - 90;
+    drawIntroShoppingCart(cartX, 52, 1.0);
+  }
+}
+
+function drawIntroSkater(x, y, scaleAmt, facing = 1) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  noStroke();
+  fill(80, 200, 200);
+  rectMode(CENTER);
+  rect(0, 4, 24, 4, 2);
+  fill(20);
+  ellipse(-8, 6, 4, 4);
+  ellipse(8, 6, 4, 4);
+
+  stroke(0);
+  strokeWeight(3);
+  line(-4, -2, -4, 2);
+  line(4, -2, 4, 2);
+
+  noStroke();
+  fill(230, 120, 80);
+  rect(0, -10, 14, 16, 4);
+
+  fill(240, 210, 180);
+  ellipse(0, -22, 14, 14);
+  fill(60, 80, 130);
+  rect(0, -24, 16, 4, 2);
+
+  stroke(240, 210, 180);
+  strokeWeight(2.5);
+  line(-6, -12, -12, -10);
+  line(6, -12, 12, -10);
+
+  pop();
+}
+
+function drawIntroBoombox(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(60, 60, 70);
+  rect(0, 0, 24, 12, 2);
+  fill(30);
+  ellipse(-6, 0, 6, 6);
+  ellipse(6, 0, 6, 6);
+  fill(200, 200, 210);
+  rect(0, -4, 10, 3, 1);
+
+  pop();
+}
+
+function drawIntroShoppingCart(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noFill();
+  stroke(200, 200, 210);
+  strokeWeight(2);
+  rectMode(CENTER);
+  rect(0, -4, 20, 10, 2);
+
+  line(10, -9, 14, -12);
+
+  noStroke();
+  fill(40);
+  ellipse(-6, 2, 4, 4);
+  ellipse(6, 2, 4, 4);
+
+  pop();
+}
+
+function drawStage12Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  push();
+  noStroke();
+  fill(6, 8, 26, 240);
+  rectMode(CENTER);
+  rect(0, 0, 260, 90, 10);
+
+  fill(24, 26, 60, 240);
+  rect(-80, 10, 40, 70, 4);
+  rect(0, 0, 60, 80, 4);
+  rect(80, 6, 40, 60, 4);
+
+  fill(80, 220, 250);
+  rect(-80, -10, 6, 40);
+  fill(250, 80, 180);
+  rect(0, -18, 6, 50);
+  fill(160, 250, 160);
+  rect(80, -6, 6, 32);
+  pop();
+
+  push();
+  noStroke();
+  fill(30, 40, 70, 240);
+  rect(0, 64, 260, 32, 10);
+  pop();
+
+  drawIntroMech(0, 20, 1.2);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -40, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, 52, 1.2, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-40, 52, 1.2, 0, false);
+
+    drawIntroMech(0, 20, 1.2, true);
+
+    const d1x = lerp(40, 10, p);
+    const d2x = lerp(-40, -10, p);
+    drawIntroDrone(d1x, 24, 0.9);
+    drawIntroDrone(d2x, 18, 0.9);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-40, width * 0.45, p);
+    drawIntroPlayer(heroX, 52, 1.2, 0, true);
+
+    drawIntroDrone(heroX - 40, 24, 0.9);
+    drawIntroDrone(heroX - 70, 30, 0.9);
+
+    const discX = heroX - 90;
+    drawIntroEnergyDisc(discX, 52, 1.0);
+  }
+}
+
+function drawIntroMech(x, y, scaleAmt, awake = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(60, 90, 130);
+  rect(0, -2, 40, 30, 4);
+
+  fill(40, 60, 100);
+  rect(0, -22, 26, 16, 3);
+
+  const visorAlpha = awake ? 230 : 140;
+  fill(80, 240, 250, visorAlpha);
+  rect(0, -22, 18, 6, 2);
+
+  fill(60, 90, 130);
+  rect(-24, -4, 8, 24, 3);
+  rect(24, -4, 8, 24, 3);
+
+  rect(-10, 16, 10, 18, 2);
+  rect(10, 16, 10, 18, 2);
+
+  pop();
+}
+
+function drawIntroDrone(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const wobble = Math.sin(frameCount * 0.3) * 3;
+
+  noStroke();
+  fill(60, 180, 220);
+  ellipse(0, wobble, 14, 10);
+  fill(20, 40, 60);
+  ellipse(0, wobble, 6, 6);
+
+  fill(80, 220, 250);
+  ellipse(-8, wobble, 4, 4);
+  ellipse(8, wobble, 4, 4);
+
+  pop();
+}
+
+function drawIntroEnergyDisc(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+  rotate(frameCount * 0.3);
+
+  noFill();
+  stroke(80, 240, 250);
+  strokeWeight(3);
+  ellipse(0, 0, 16, 16);
+  stroke(250, 80, 200);
+  strokeWeight(2);
+  ellipse(0, 0, 10, 10);
 
   pop();
 }
