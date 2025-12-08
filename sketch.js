@@ -2574,6 +2574,15 @@ function drawLevelVignette(levelIndex, t) {
     case 6:
       drawStage7Vignette(t);
       break;
+    case 7:
+      drawStage8Vignette(t);
+      break;
+    case 8:
+      drawStage9Vignette(t);
+      break;
+    case 9:
+      drawStage10Vignette(t);
+      break;
     default:
       drawSimpleVignette(t);
       break;
@@ -3487,6 +3496,403 @@ function drawIntroWallGuard(x, y, scaleAmt) {
   strokeWeight(2.5);
   line(6, -10, 14, 4);
   line(14, 4, 18, -2);
+
+  pop();
+}
+
+function drawStage8Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  push();
+  noStroke();
+  fill(40, 80, 40, 220);
+  ellipse(0, 60, 260, 70);
+  pop();
+
+  push();
+  noStroke();
+  fill(120, 110, 140, 220);
+  rectMode(CENTER);
+  rect(0, 10, 220, 70, 8);
+  fill(90, 80, 120, 230);
+  rect(-70, -10, 40, 50, 4);
+  rect(70, -10, 40, 50, 4);
+  pop();
+
+  push();
+  stroke(200, 190, 160);
+  strokeWeight(4);
+  line(-130, 40, 130, 40);
+  pop();
+
+  drawIntroKnight(-70, 32, 1.3, 1);
+  drawIntroKnight(40, 32, 1.3, -1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -30, p);
+    const y = lerp(10, 46, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, y, 1.25, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-30, 46, 1.25, 0, false);
+
+    const tilt = radians(10 + 15 * p);
+    drawIntroKnight(-70, 32, 1.3, 1, tilt);
+    drawIntroKnight(40, 32, 1.3, -1, -tilt);
+
+    drawIntroWarHorse(-5, 54, 1.1, Math.sin(frameCount * 0.3) * 0.1);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-30, width * 0.45, p);
+    drawIntroPlayer(heroX, 46, 1.25, 0, true);
+
+    const chaser1X = lerp(-70, heroX - 50, p);
+    const chaser2X = lerp(40, heroX - 20, p);
+    drawIntroKnight(chaser1X, 32, 1.3, 1);
+    drawIntroKnight(chaser2X, 32, 1.3, 1);
+
+    const horseX = lerp(-5, heroX - 70, p);
+    drawIntroWarHorse(horseX, 54, 1.1, 0);
+  }
+}
+
+function drawIntroKnight(x, y, scaleAmt, facing = 1, lanceTilt = 0) {
+  push();
+  translate(x, y);
+  scale(scaleAmt * facing, scaleAmt);
+
+  noStroke();
+  fill(120, 90, 70);
+  ellipse(0, 6, 30, 14);
+  rect(0, 0, 24, 10, 4);
+
+  stroke(80, 50, 40);
+  strokeWeight(3);
+  line(-8, 12, -8, 18);
+  line(8, 12, 8, 18);
+
+  noStroke();
+  fill(180, 160, 200);
+  rect(0, -12, 14, 18, 4);
+
+  fill(220, 220, 230);
+  ellipse(0, -22, 14, 12);
+  stroke(70, 70, 90);
+  strokeWeight(1.5);
+  line(-4, -22, 4, -22);
+
+  noStroke();
+  fill(230, 200, 110);
+  ellipse(-10, -10, 10, 14);
+
+  push();
+  translate(8, -14);
+  rotate(lanceTilt);
+  stroke(230, 210, 170);
+  strokeWeight(3);
+  line(0, 0, 26, -10);
+  triangle(26, -10, 30, -8, 30, -12);
+  pop();
+
+  pop();
+}
+
+function drawIntroWarHorse(x, y, scaleAmt, wobble = 0) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+  rotate(wobble);
+
+  noStroke();
+  fill(130, 100, 80);
+  ellipse(0, 4, 24, 12);
+  rect(0, 0, 18, 8, 4);
+  fill(150, 110, 90);
+  ellipse(10, -2, 10, 8);
+
+  stroke(80, 50, 40);
+  strokeWeight(3);
+  line(-6, 8, -6, 14);
+  line(6, 8, 6, 14);
+
+  pop();
+}
+
+function drawStage9Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  push();
+  noStroke();
+  fill(40, 24, 18, 230);
+  rectMode(CENTER);
+  rect(0, 10, 260, 90, 8);
+  fill(80, 55, 40, 240);
+  rect(0, 65, 260, 30, 6);
+  pop();
+
+  push();
+  rectMode(CENTER);
+  noStroke();
+  fill(200, 220, 240, 220);
+  rect(-70, -5, 70, 40, 6);
+  rect(60, -5, 70, 40, 6);
+  stroke(40, 90, 140);
+  strokeWeight(2);
+  line(-90, -10, -50, 0);
+  line(40, -15, 80, -5);
+  pop();
+
+  push();
+  noStroke();
+  fill(130, 90, 60);
+  rect(-20, 30, 80, 18, 4);
+  pop();
+
+  drawIntroInventor(-40, 28, 1.2);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -10, p);
+    const y = lerp(10, 36, p);
+    const spin = p * TWO_PI * 4;
+    drawIntroPlayer(x, y, 1.2, spin, false);
+
+    drawIntroBlueprint(-10, 10 - 20 * p, 0.7);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-10, 36, 1.2, 0, false);
+
+    drawIntroInventor(-40, 28, 1.2, true);
+
+    const flyerX = lerp(40, 10, p);
+    const flyerY = 10 - Math.sin(p * Math.PI) * 18;
+    drawIntroFlyingRig(flyerX, flyerY, 1.0);
+
+    const crawlerX = lerp(70, 40, p);
+    drawIntroClockworkCrawler(crawlerX, 50, 1.0);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-10, width * 0.45, p);
+    drawIntroPlayer(heroX, 36, 1.2, 0, true);
+
+    drawIntroFlyingRig(heroX - 40, 8, 1.0);
+    drawIntroClockworkCrawler(heroX - 60, 50, 1.0);
+  }
+}
+
+function drawIntroInventor(x, y, scaleAmt, pullingLever = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(180, 150, 110);
+  rect(0, -6, 20, 26, 5);
+
+  fill(235, 210, 180);
+  ellipse(0, -24, 16, 18);
+
+  fill(120, 90, 60);
+  arc(0, -24, 20, 16, Math.PI, 0);
+  arc(0, -18, 14, 12, 0, Math.PI);
+
+  fill(0);
+  ellipse(-4, -25, 2.5, 2.5);
+  ellipse(4, -25, 2.5, 2.5);
+
+  stroke(235, 210, 180);
+  strokeWeight(3);
+  if (pullingLever) {
+    line(-6, -10, -16, -18);
+    line(6, -10, 16, -2);
+  } else {
+    line(-6, -10, -16, -6);
+    line(6, -10, 16, -14);
+  }
+
+  pop();
+}
+
+function drawIntroBlueprint(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(180, 210, 240, 230);
+  rect(0, 0, 50, 30, 6);
+  stroke(40, 90, 140);
+  strokeWeight(2);
+  line(-20, 0, 20, -6);
+  line(-15, 6, 10, 10);
+
+  pop();
+}
+
+function drawIntroFlyingRig(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const flap = Math.sin(frameCount * 0.25) * 8;
+
+  noStroke();
+  fill(180, 150, 110);
+  ellipse(0, 2, 18, 10);
+
+  push();
+  rotate(radians(flap));
+  fill(225, 215, 190);
+  triangle(-18, 0, 0, -10, 18, 0);
+  pop();
+
+  fill(160, 130, 100);
+  triangle(-4, 3, -10, 8, 2, 8);
+
+  pop();
+}
+
+function drawIntroClockworkCrawler(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(170, 130, 80);
+  ellipse(0, 0, 18, 12);
+  fill(210, 170, 110);
+  ellipse(0, -4, 10, 8);
+
+  stroke(90, 70, 40);
+  strokeWeight(2);
+  line(-6, 4, -10, 8);
+  line(6, 4, 10, 8);
+
+  noFill();
+  stroke(220, 200, 160);
+  strokeWeight(2);
+  ellipse(0, 0, 8, 8);
+
+  pop();
+}
+
+function drawStage10Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  push();
+  noStroke();
+  fill(10, 30, 50, 230);
+  rectMode(CENTER);
+  rect(0, 0, 260, 80, 10);
+  fill(20, 60, 90, 230);
+  rect(0, 20, 260, 40);
+  pop();
+
+  push();
+  noStroke();
+  fill(12, 18, 30, 220);
+  triangle(-80, -10, -40, -40, 0, -10);
+  rect(-60, -6, 40, 10);
+  rect(-60, -22, 4, 24);
+  pop();
+
+  push();
+  noStroke();
+  fill(70, 70, 80, 240);
+  rect(0, 60, 260, 40, 6);
+  pop();
+
+  drawIntroMusketeer(40, 32, 1.2);
+  drawIntroCannon(0, 44, 1.1);
+
+  if (t < 0.33) {
+    const p = t / 0.33;
+    const x = lerp(-width * 0.45, -40, p);
+    const spin = p * TWO_PI * 3;
+    drawIntroPlayer(x, 40, 1.2, spin, false);
+  } else if (t < 0.66) {
+    const p = (t - 0.33) / 0.33;
+    drawIntroPlayer(-40, 40, 1.2, 0, false);
+
+    drawIntroMusketeer(40, 32, 1.2, true);
+
+    const bx = lerp(0, -10, p);
+    const by = 44 - Math.sin(p * Math.PI) * 20;
+    drawIntroCannonball(bx, by, 1.0);
+  } else {
+    const p = (t - 0.66) / 0.34;
+    const heroX = lerp(-40, width * 0.45, p);
+    drawIntroPlayer(heroX, 40, 1.2, 0, true);
+
+    const ballX = lerp(-10, heroX - 50, p);
+    drawIntroCannonball(ballX, 44, 1.0);
+
+    const pursuerX = lerp(40, heroX - 20, p);
+    drawIntroMusketeer(pursuerX, 32, 1.2, false);
+  }
+}
+
+function drawIntroMusketeer(x, y, scaleAmt, firing = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  rectMode(CENTER);
+  noStroke();
+  fill(60, 80, 110);
+  rect(0, -4, 18, 26, 4);
+
+  fill(230, 210, 180);
+  ellipse(0, -22, 14, 16);
+
+  fill(30, 40, 60);
+  rect(0, -24, 20, 4, 2);
+  rect(0, -28, 12, 6, 2);
+
+  stroke(120, 80, 50);
+  strokeWeight(3);
+  if (firing) {
+    line(-4, -14, 18, -22);
+    noStroke();
+    fill(255, 240, 200, 220);
+    ellipse(20, -22, 10, 8);
+  } else {
+    line(-4, -14, 18, -18);
+  }
+
+  pop();
+}
+
+function drawIntroCannon(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(40, 40, 50);
+  ellipse(0, 4, 28, 14);
+  rect(-2, 0, 24, 10, 4);
+  fill(60, 60, 70);
+  rect(8, -4, 16, 8, 3);
+
+  pop();
+}
+
+function drawIntroCannonball(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+  rotate(frameCount * 0.2);
+
+  noStroke();
+  fill(40, 40, 50);
+  ellipse(0, 0, 14, 14);
+  fill(90, 90, 110);
+  ellipse(0, 0, 6, 6);
 
   pop();
 }
