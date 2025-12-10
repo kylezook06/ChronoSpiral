@@ -22,11 +22,14 @@ const TIME_WARDEN_PULL_MAX = 220;
 
 const MAX_LIVES = 3;
 let lives = MAX_LIVES;
+// --- Plus mode & post-game state ---
+let plusModeActive = false;
+let plusModeUnlocked = false;
 
 const START_THETA_FACTOR = 0.9; // start near the outer edge
 
 // Game states
-let GAME_STATE = "MAP"; // MAP | INTRO | PLAY | GAME_OVER
+let GAME_STATE = "MAP"; // MAP | INTRO | PLAY | GAME_OVER | POST_GAME
 let introTimer = 0;
 const DEFAULT_INTRO_DURATION = 120; // frames (~2 seconds)
 const LONG_INTRO_DURATION = 180; // slightly longer vignette for Chrono Core
@@ -390,6 +393,10 @@ const sfxFiles = {
 const CHRONO_CORE_INDEX = levels.length - 2; // Final Stage — Chrono Core
 const BOSS_LEVEL_INDEX = levels.length - 1; // Time Warden
 const BOSS_SHARD_GOAL = 60;
+function getBossShardGoal() {
+  // Base game: 60 shards. NG+ bumps the Chaos Core requirement to 120.
+  return plusModeActive ? 120 : BOSS_SHARD_GOAL;
+}
 const DOUBLE_JUMP_SHARD_THRESHOLD = 30;
 const INVULN_SHARD_THRESHOLD = 15;
 const FREEZE_SHARD_THRESHOLD = 45;
@@ -2292,6 +2299,17 @@ function keyPressed() {
     }
   } else if (GAME_STATE === "GAME_OVER") {
     if (keyCode === ENTER || keyCode === RETURN) {
+      plusModeActive = false;
+      resetRunProgress();
+      GAME_STATE = "MAP";
+    }
+  } else if (GAME_STATE === "POST_GAME") {
+    if (key === "1") {
+      plusModeActive = false;
+      resetRunProgress();
+      GAME_STATE = "MAP";
+    } else if (key === "2") {
+      plusModeActive = true;
       resetRunProgress();
       GAME_STATE = "MAP";
     }
@@ -2335,6 +2353,12 @@ function draw() {
   if (GAME_STATE === "GAME_OVER") {
     stopCurrentMusic();
     drawGameOverScreen();
+    return;
+  }
+
+  if (GAME_STATE === "POST_GAME") {
+    stopCurrentMusic();
+    drawPostGameInterstitial();
     return;
   }
 
@@ -2423,12 +2447,23 @@ function drawMapScreen() {
     headerBottom = 40 + 32;
   }
 
+  // NG+ badge beneath the logo/title when active
+  if (plusModeActive) {
+    textAlign(CENTER, TOP);
+    textSize(14);
+    fill(120, 255, 200);
+    text("NG+ MODE", width / 2, headerBottom + 4);
+    headerBottom += 22;
+  }
+
   textSize(18);
   text("Era Select", width / 2, headerBottom + 10);
   textSize(14);
   text("LEFT/RIGHT: choose • ENTER: travel • ESC: exit level", width / 2, headerBottom + 30);
+  const bossGoal = getBossShardGoal();
+  const modeTag = plusModeActive ? "NG+ " : "";
   text(
-    `Time Shards: ${globalShardTotal}  •  Chaos Core unlock at ${BOSS_SHARD_GOAL}`,
+    `Time Shards: ${globalShardTotal}  •  ${modeTag}Chaos Core unlock at ${bossGoal}`,
     width / 2,
     headerBottom + 50
   );
@@ -2469,8 +2504,19 @@ function drawMapScreen() {
 
     stroke(255);
     strokeWeight(isSelected ? 4 : 2);
-    fill(isUnlocked ? 220 : 80);
+    if (plusModeActive && isUnlocked) {
+      fill(140, 255, 220);
+    } else {
+      fill(isUnlocked ? 220 : 80);
+    }
     ellipse(x, y, isSelected ? 30 : 22);
+
+    if (plusModeActive && isUnlocked) {
+      textAlign(CENTER, CENTER);
+      textSize(isSelected ? 14 : 12);
+      fill(10, 20, 20);
+      text("+", x, y - 1);
+    }
 
     noStroke();
     fill(230);
@@ -2481,7 +2527,9 @@ function drawMapScreen() {
     if (!isUnlocked) {
       let lockLabel = "(locked)";
       if (i === CHRONO_CORE_INDEX) {
-        lockLabel = `(Need ${BOSS_SHARD_GOAL} shards)`;
+        lockLabel = plusModeActive
+          ? `(Need ${bossGoal} shards — NG+)`
+          : `(Need ${bossGoal} shards)`;
       } else if (i === BOSS_LEVEL_INDEX) {
         lockLabel = "(Defeat Chaos Core)";
       }
@@ -2498,6 +2546,80 @@ function drawGameOverScreen() {
   text("GAME OVER", width / 2, height / 2 - 10);
   textSize(16);
   text("Press ENTER to restart", width / 2, height / 2 + 18);
+}
+
+function drawPostGameInterstitial() {
+  background(10, 5, 25);
+
+  // Dim overlay
+  noStroke();
+  fill(0, 0, 0, 150);
+  rect(0, 0, width, height);
+
+  // Portal on the left
+  push();
+  translate(width * 0.25, height * 0.55);
+  const portalPulse = 20 + 6 * sin(frameCount * 0.12);
+  noFill();
+  stroke(120, 220, 255);
+  strokeWeight(4);
+  ellipse(0, 0, portalPulse * 3, portalPulse * 3);
+  stroke(80, 180, 255, 180);
+  ellipse(0, 0, portalPulse * 4, portalPulse * 4);
+  pop();
+
+  // Hero leaping from the portal
+  push();
+  translate(width * 0.25 + 60, height * 0.45 - 10 * sin(frameCount * 0.2));
+  drawIntroPlayer(0, 0, 1.1, 0, true);
+  pop();
+
+  const baseX = width * 0.6;
+  const baseY = height * 0.6;
+  const bob = 6 * sin(frameCount * 0.2);
+
+  // Scientists cheering
+  for (let i = 0; i < 4; i++) {
+    const sx = baseX + (i - 1.5) * 40;
+    const phase = frameCount * 0.2 + i * 0.8;
+    const sy = baseY + bob * sin(phase);
+
+    push();
+    translate(sx, sy);
+    noStroke();
+    fill(255, 230);
+    rect(-10, 0, 20, 28, 4);
+    fill(240, 220, 200);
+    ellipse(0, -10, 16, 16);
+    stroke(240, 220, 200);
+    strokeWeight(3);
+    line(-10, 4, -18, -8);
+    line(10, 4, 18, -8);
+    pop();
+  }
+
+  // Hero being carried above them
+  push();
+  translate(baseX, baseY - 40 + bob);
+  drawIntroPlayer(0, 0, 1.1, 0, true);
+  pop();
+
+  // Text copy
+  fill(255);
+  textAlign(CENTER, CENTER);
+  textSize(28);
+  text("Congratulations! You fixed history.", width / 2, height * 0.18);
+
+  textSize(16);
+  text("Press 1 to play again (normal mode).", width / 2, height * 0.28);
+  text("Press 2 to play again in NG+ Mode:", width / 2, height * 0.34);
+  text("Twice as many enemies, 120 shards needed for Chaos Core.", width / 2, height * 0.40);
+
+  if (!plusModeUnlocked) {
+    textSize(14);
+    fill(180);
+    text("(Plus Mode unlocks after your first clear.)", width / 2, height * 0.46);
+  }
 }
 
 function drawWrappedLabel(str, x, startY, maxWidth, lineHeight) {
@@ -4805,6 +4927,14 @@ function drawHUD(level) {
   textAlign(RIGHT, TOP);
   text(`Time: ${mm}:${ss}`, width - 16, 12);
   text(`Lives: ${lives}`, width - 16, 28);
+
+  // NG+ badge in HUD when active
+  if (plusModeActive) {
+    textSize(12);
+    fill(120, 255, 200);
+    textAlign(RIGHT, TOP);
+    text("NG+ MODE", width - 16, 44);
+  }
 }
 
 function drawUnlockBanner() {
@@ -4834,7 +4964,7 @@ function warpToNextLevel() {
   }
 
   const next = Math.min(currentLevel + 1, levels.length - 1);
-  if (next === CHRONO_CORE_INDEX && globalShardTotal < BOSS_SHARD_GOAL) {
+  if (next === CHRONO_CORE_INDEX && globalShardTotal < getBossShardGoal()) {
     checkChronoCoreUnlock();
     GAME_STATE = "MAP";
     return;
@@ -4906,18 +5036,25 @@ function handleLevelTimeout() {
 }
 
 function handleBossVictory() {
+  playSfx("warp");
   bossPullOffset = 0;
   bossCollapseRate = 1;
   shardsEarnedThisRun = 0;
-  GAME_STATE = "MAP";
+  plusModeUnlocked = true;
+  GAME_STATE = "POST_GAME";
 }
 
 function generateEnemies() {
   enemies.length = 0;
   const level = currentLevelObj();
-  const count = level.enemyCount || 6;
+  let count = level.enemyCount || 6;
   const offsets = level.enemyOffsets || [-30, -10, 10, 30];
   const stageIndex = currentLevel;
+
+  // Double enemy count in NG+ on all non-boss stages
+  if (!level.isCoreBossLevel && plusModeActive) {
+    count *= 2;
+  }
 
   // Core boss: spawn the main Warden plus a fleet of smaller sentinels
   if (level.isCoreBossLevel) {
@@ -5204,7 +5341,7 @@ function countCollectedInCurrentLevel() {
 }
 
 function checkChronoCoreUnlock() {
-  if (!unlockedLevels[CHRONO_CORE_INDEX] && globalShardTotal >= BOSS_SHARD_GOAL) {
+  if (!unlockedLevels[CHRONO_CORE_INDEX] && globalShardTotal >= getBossShardGoal()) {
     unlockedLevels[CHRONO_CORE_INDEX] = true;
   }
 }
@@ -5240,7 +5377,7 @@ function handleShardMilestones() {
 }
 
 function grantPlaytestUnlock() {
-  globalShardTotal = Math.max(globalShardTotal, BOSS_SHARD_GOAL);
+  globalShardTotal = Math.max(globalShardTotal, getBossShardGoal());
   checkChronoCoreUnlock();
   unlockedLevels[BOSS_LEVEL_INDEX] = true;
   selectedLevelIndex = Math.max(selectedLevelIndex, CHRONO_CORE_INDEX);
