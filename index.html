@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChronoSpiral Prototype</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #0a0a18;
+        color: #e9f4ff;
+        font-family: "Press Start 2P", "Courier New", monospace;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      header {
+        margin: 16px 0 8px;
+        text-align: center;
+      }
+
+      .logo-stack {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .logo {
+        width: 480px;
+        height: auto;
+        max-width: 90vw;
+        image-rendering: auto;
+      }
+
+      .subtitle {
+        font-size: 1rem;
+        letter-spacing: 1px;
+      }
+
+      canvas {
+        border: 3px solid #2bd1a1;
+        image-rendering: pixelated;
+      }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.1/lib/p5.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/p5@1.11.1/lib/addons/p5.sound.min.js"></script>
+    <script src="sketch.js" defer></script>
+  </head>
+  <body>
+    <header>
+      <div class="logo-stack">
+        <img src="assets/ChronoSpiral-logo-480.png" alt="ChronoSpiral" class="logo" />
+        <div class="subtitle">Era Select</div>
+      </div>
+    </header>
+    <main></main>
+  </body>
+</html>
