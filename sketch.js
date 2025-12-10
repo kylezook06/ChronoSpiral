@@ -397,14 +397,21 @@ function getBossShardGoal() {
   // Base game: 60 shards. NG+ bumps the Chaos Core requirement to 120.
   return plusModeActive ? 120 : BOSS_SHARD_GOAL;
 }
-const DOUBLE_JUMP_SHARD_THRESHOLD = 30;
+const MAIN_STAGE_COUNT = 12;
+const DOUBLE_JUMP_SHARD_THRESHOLD = 45;
 const INVULN_SHARD_THRESHOLD = 15;
-const FREEZE_SHARD_THRESHOLD = 45;
+const FREEZE_SHARD_THRESHOLD = 30;
 const INVULN_DURATION = 60; // frames
 const FREEZE_DURATION = 120; // frames
 const INVULN_COOLDOWN_FRAMES = 15 * 60; // 15 seconds at 60fps
 const FREEZE_COOLDOWN_FRAMES = 30 * 60; // 30 seconds at 60fps
 const EXTRA_LIFE_SHARD_STEP = 60;
+
+function getFreezeDurationFrames() {
+  // Base 2s freeze plus +2s per 30 shards collected.
+  const extra = Math.floor(globalShardTotal / 30) * 120;
+  return FREEZE_DURATION + extra;
+}
 
 let invulnUnlocked = false;
 let freezeUnlocked = false;
@@ -412,6 +419,7 @@ let doubleJumpUnlocked = false;
 let extraLivesAwarded = 0;
 let unlockMessage = "";
 let unlockMessageTimer = 0;
+let completedMainLevels = new Set();
 
 const enemies = [];
 const shards = [];
@@ -430,6 +438,7 @@ const musicCache = [];
 const musicLoadState = [];
 let musicMuted = false;
 const sfxCache = {};
+let hitSfxCooldown = 0;
 
 // --- Helpers for current level & platform curve ---
 
@@ -2337,13 +2346,15 @@ function keyPressed() {
       freezeCooldown <= 0 &&
       freezeFrames <= 0
     ) {
-      freezeFrames = FREEZE_DURATION;
+      freezeFrames = getFreezeDurationFrames();
       freezeCooldown = FREEZE_COOLDOWN_FRAMES;
     }
   }
 }
 
 function draw() {
+  if (hitSfxCooldown > 0) hitSfxCooldown--;
+
   if (GAME_STATE === "MAP") {
     stopCurrentMusic();
     drawMapScreen();
@@ -4821,7 +4832,10 @@ function drawEnemies() {
         const type = e.subtype || currentLevelObj().enemyType;
         if (currentLevelObj().isCoreBossLevel) {
           // Boss hits yank the traveler outward without costing a life.
-          playSfx("hit");
+          if (hitSfxCooldown <= 0) {
+            playSfx("hit");
+            hitSfxCooldown = 30; // ~0.5s cooldown to avoid audio spam
+          }
 
           const respawn = getBossRespawn();
           player.theta = respawn.theta;
@@ -4837,7 +4851,10 @@ function drawEnemies() {
           invulnFrames = 60;
           return;
         }
-        playSfx("hit");
+        if (hitSfxCooldown <= 0) {
+          playSfx("hit");
+          hitSfxCooldown = 30;
+        }
         resetPlayerToStart();
       }
     }
@@ -4870,8 +4887,12 @@ function drawHUD(level) {
   text(level.name, 14, 12);
   text(`Theme hint: ${level.musicHint}`, 14, 30);
   text(`Year: ${level.year} — ${level.location}`, 14, 48);
-  text("Arrow keys: run • X/Up/Space: jump", 14, 66);
-  text("Down/C/Alt: drop • Air double-jump after 30 shards", 14, 82);
+    text("Arrow keys: run • X/Up/Space: jump", 14, 66);
+    text(
+      `Down/C/Alt: drop • Air double-jump after ${DOUBLE_JUMP_SHARD_THRESHOLD} shards`,
+      14,
+      82
+    );
 
   // Warp progress bar
   const outerR = level.platformCurve(maxTheta);
@@ -4908,12 +4929,13 @@ function drawHUD(level) {
 
   let freezeStatus = `Freeze: locked (need ${FREEZE_SHARD_THRESHOLD})`;
   if (freezeReady) {
+    const freezeReadySeconds = Math.ceil(getFreezeDurationFrames() / 60);
     if (freezeFrames > 0) {
       freezeStatus = `Freeze: active (${Math.ceil(freezeFrames / 60)}s)`;
     } else if (freezeCooldown > 0) {
       freezeStatus = `Freeze: cooldown (${Math.ceil(freezeCooldown / 60)}s)`;
     } else {
-      freezeStatus = "Freeze: ready (D)";
+      freezeStatus = `Freeze: ready (D, ${freezeReadySeconds}s)`;
     }
   }
 
@@ -4956,6 +4978,21 @@ function drawUnlockBanner() {
 
 function warpToNextLevel() {
   const level = currentLevelObj();
+
+  // After completing a main-stage era, lock it until all 12 have been cleared
+  // in the current run.
+  if (!level.isPulseLevel && !level.isCoreBossLevel && currentLevel < MAIN_STAGE_COUNT) {
+    completedMainLevels.add(currentLevel);
+    unlockedLevels[currentLevel] = false;
+
+    if (completedMainLevels.size >= MAIN_STAGE_COUNT) {
+      for (let i = 0; i < MAIN_STAGE_COUNT; i++) {
+        unlockedLevels[i] = true;
+      }
+      completedMainLevels.clear();
+    }
+  }
+
   if (level.isPulseLevel && currentLevel === CHRONO_CORE_INDEX) {
     unlockedLevels[BOSS_LEVEL_INDEX] = true;
     selectedLevelIndex = BOSS_LEVEL_INDEX;
@@ -5040,6 +5077,9 @@ function handleBossVictory() {
   bossPullOffset = 0;
   bossCollapseRate = 1;
   shardsEarnedThisRun = 0;
+  // Beating the Time Warden unlocks the full map for replay
+  unlockedLevels = levels.map(() => true);
+  completedMainLevels.clear();
   plusModeUnlocked = true;
   GAME_STATE = "POST_GAME";
 }
@@ -5379,6 +5419,8 @@ function handleShardMilestones() {
 function grantPlaytestUnlock() {
   globalShardTotal = Math.max(globalShardTotal, getBossShardGoal());
   checkChronoCoreUnlock();
+  unlockedLevels = levels.map(() => true);
+  completedMainLevels.clear();
   unlockedLevels[BOSS_LEVEL_INDEX] = true;
   selectedLevelIndex = Math.max(selectedLevelIndex, CHRONO_CORE_INDEX);
   handleShardMilestones();
@@ -5395,6 +5437,7 @@ function resetRunProgress() {
   freezeFrames = 0;
   invulnCooldown = 0;
   freezeCooldown = 0;
+  hitSfxCooldown = 0;
   pulseActive = false;
   pulseHeadTheta = 0;
   pulseCooldown = 0;
@@ -5405,6 +5448,7 @@ function resetRunProgress() {
   doubleJumpUnlocked = false;
   unlockMessage = "";
   unlockMessageTimer = 0;
+  completedMainLevels = new Set();
 
   // All eras are playable from the start except the Chaos Core and final boss
   unlockedLevels = levels.map((_, i) => i < CHRONO_CORE_INDEX);
