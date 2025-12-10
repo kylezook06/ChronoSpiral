@@ -2594,6 +2594,9 @@ function drawLevelVignette(levelIndex, t) {
     case CHRONO_CORE_INDEX:
       drawStage13Vignette(t);
       break;
+    case BOSS_LEVEL_INDEX:
+      drawStage14Vignette(t);
+      break;
     default:
       drawSimpleVignette(t);
       break;
@@ -4258,6 +4261,183 @@ function drawIntroCoreElectricity(cx, cy, radius, bolts) {
     const y2 = Math.sin(a) * (radius + 4);
     line(x1, y1, x2, y2);
   }
+
+  pop();
+}
+
+function drawStage14Vignette(t) {
+  t = constrain(t, 0, 1);
+
+  // Dark arena floor beneath the core
+  push();
+  noStroke();
+  fill(6, 4, 18, 240);
+  ellipse(0, 64, 260, 70);
+  pop();
+
+  // Central Chaos Core and a small rim platform
+  drawIntroBossCore(0, 10, 1.2, t, false);
+  drawIntroBossPlatform(80, 40, 1.0);
+
+  if (t < 0.35) {
+    // Phase 1: traveler winds up and throws a shard into the core
+    const p = t / 0.35;
+    const heroX = lerp(-width * 0.45, -80, p);
+    drawIntroPlayer(heroX, 52, 1.1, 0, false);
+
+    const shardP = constrain((p - 0.1) / 0.7, 0, 1);
+    const sx = lerp(heroX + 25, 0, shardP);
+    const sy = lerp(52, 10, shardP) - Math.sin(shardP * Math.PI) * 28;
+    drawIntroBossShard(sx, sy, 1.0);
+  } else if (t < 0.7) {
+    // Phase 2: core overloads, Time Warden begins to form
+    const p = (t - 0.35) / 0.35;
+    const heroShake = Math.sin(frameCount * 0.4) * 2;
+    drawIntroPlayer(-70, 52 + heroShake, 1.1, 0, false);
+
+    drawIntroBossCore(0, 10, 1.2 + 0.15 * p, t, true);
+    drawIntroBossElectricity(0, 10, 40 + 6 * p, 5 + 4 * p);
+
+    const wScale = 0.4 + 0.3 * p;
+    drawIntroTimeWarden(0, -6, wScale, 80 + 80 * p);
+  } else {
+    // Phase 3: Warden erupts, expanding shockwave chases traveler off-screen
+    const p = (t - 0.7) / 0.3;
+    const heroX = lerp(-70, width * 0.45, p);
+    const heroY = lerp(52, 40, min(p * 1.4, 1));
+    drawIntroPlayer(heroX, heroY, 1.1, 0, true);
+
+    const wScale = 0.8 + 0.4 * p;
+    drawIntroTimeWarden(0, -10, wScale, 200);
+
+    const waveRadius = 50 + 100 * p;
+    drawIntroBossShockwave(0, 10, waveRadius);
+  }
+}
+
+function drawIntroBossCore(x, y, scaleAmt, t, overloaded = false) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const pulse = 8 * Math.sin(frameCount * 0.25);
+  const overloadFactor = overloaded ? 1.4 : 1.0;
+
+  noStroke();
+  fill(140, 60, 220, 140);
+  ellipse(0, 0, (80 + pulse) * overloadFactor, (80 + pulse) * overloadFactor);
+
+  fill(120, 255, 220, 230);
+  ellipse(0, 0, (34 + pulse) * overloadFactor, (26 + pulse) * overloadFactor);
+
+  fill(255, 250, 210, 240);
+  ellipse(0, 0, (18 + pulse * 0.6) * overloadFactor, (18 + pulse * 0.6) * overloadFactor);
+
+  pop();
+}
+
+function drawIntroBossPlatform(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(50, 210, 220, 230);
+  ellipse(0, 0, 48, 16);
+  fill(0, 40);
+  ellipse(0, 3, 26, 8);
+
+  pop();
+}
+
+function drawIntroBossShard(x, y, scaleAmt) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  const spin = frameCount * 0.25;
+  rotate(spin);
+  noStroke();
+  fill(120, 255, 255, 230);
+  quad(-4, -8, 4, -6, 4, 8, -4, 6);
+
+  fill(255, 255, 240, 220);
+  ellipse(0, -6, 4, 4);
+
+  pop();
+}
+
+function drawIntroBossElectricity(cx, cy, radius, bolts) {
+  push();
+  translate(cx, cy);
+
+  stroke(120, 240, 255);
+  strokeWeight(3);
+  noFill();
+
+  const count = Math.floor(bolts);
+  for (let i = 0; i < count; i++) {
+    const a = (TWO_PI / count) * i + frameCount * 0.15;
+    const innerR = radius - 8;
+    const outerR = radius + 8;
+
+    const x1 = Math.cos(a) * innerR;
+    const y1 = Math.sin(a) * innerR;
+    const x2 = Math.cos(a + 0.1) * outerR;
+    const y2 = Math.sin(a + 0.1) * outerR;
+    line(x1, y1, x2, y2);
+  }
+
+  pop();
+}
+
+function drawIntroTimeWarden(x, y, scaleAmt, glowAlpha = 160) {
+  push();
+  translate(x, y);
+  scale(scaleAmt);
+
+  noStroke();
+  fill(130, 80, 220, glowAlpha);
+  ellipse(0, -10, 80, 80);
+
+  fill(20, 18, 40);
+  beginShape();
+  vertex(-18, 10);
+  vertex(-6, -26);
+  vertex(6, -26);
+  vertex(18, 10);
+  endShape(CLOSE);
+
+  fill(230, 230, 240);
+  ellipse(0, -28, 16, 18);
+
+  stroke(40, 40, 60);
+  strokeWeight(2);
+  noFill();
+  ellipse(0, -28, 10, 10);
+  line(0, -28, 0, -24);
+  line(0, -28, 4, -28);
+
+  stroke(180, 180, 210);
+  strokeWeight(3);
+  line(10, -22, 16, 16);
+  line(16, -22, 24, -16);
+
+  pop();
+}
+
+function drawIntroBossShockwave(cx, cy, radius) {
+  push();
+  translate(cx, cy);
+
+  noFill();
+  stroke(120, 240, 255, 220);
+  strokeWeight(4);
+  ellipse(0, 0, radius * 2, radius * 2);
+
+  stroke(250, 120, 220, 180);
+  strokeWeight(2);
+  ellipse(0, 0, radius * 1.4, radius * 1.4);
 
   pop();
 }
